@@ -59,6 +59,56 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 NYNE_BASE_URL = "https://api.nyne.ai"
 
 
+def check_setup():
+    """Check if environment is configured and show setup instructions if not."""
+    env_file_exists = os.path.exists(".env")
+    has_nyne_keys = NYNE_API_KEY and NYNE_API_SECRET
+    has_llm_key = GEMINI_API_KEY or OPENAI_API_KEY or ANTHROPIC_API_KEY
+
+    if has_nyne_keys:
+        return True  # All good
+
+    # Show setup instructions
+    print("""
+╔══════════════════════════════════════════════════════════════════╗
+║                    SETUP REQUIRED                                ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Welcome to Nyne Deep Research! Before you can use this tool, you need
+to configure your API keys.
+
+STEP 1: Create your .env file
+─────────────────────────────
+    cp .env.example .env
+
+STEP 2: Get your Nyne.ai API keys
+─────────────────────────────────
+    Visit: https://nyne.ai
+    Add to .env:
+        NYNE_API_KEY=your_key_here
+        NYNE_API_SECRET=your_secret_here
+
+STEP 3: Get an LLM API key (for dossier generation)
+───────────────────────────────────────────────────
+    Choose ONE:
+    • Gemini (recommended): https://aistudio.google.com/apikey
+    • OpenAI: https://platform.openai.com/api-keys
+    • Anthropic: https://console.anthropic.com/
+
+    Add to .env:
+        GEMINI_API_KEY=your_key_here
+
+STEP 4: Run again
+─────────────────
+    python deep_research.py --email "someone@company.com"
+
+""")
+    if not env_file_exists:
+        print("    TIP: No .env file found. Run: cp .env.example .env\n")
+
+    return False
+
+
 def get_headers() -> Optional[Dict[str, str]]:
     """Get API headers with authentication. Returns None if credentials missing."""
     if not NYNE_API_KEY or not NYNE_API_SECRET:
@@ -537,6 +587,10 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
 # ============================================================================
 
 def main():
+    # Check if setup is complete
+    if not check_setup():
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(
         description="Nyne Deep Research - Comprehensive person intelligence",
         formatter_class=argparse.RawDescriptionHelpFormatter,
