@@ -112,7 +112,7 @@ ANTHROPIC_API_KEY=your_anthropic_key # Alternative
 
 | Service | URL | Notes |
 |---------|-----|-------|
-| Nyne.ai | https://nyne.ai | Required for person data |
+| Nyne.ai | https://nyne.ai | Required for person data. See [API docs](https://api.nyne.ai/documentation) |
 | Google Gemini | https://aistudio.google.com/apikey | Recommended LLM (fast, cheap) |
 | OpenAI | https://platform.openai.com/api-keys | Alternative LLM |
 | Anthropic | https://console.anthropic.com/ | Alternative LLM |
@@ -379,6 +379,7 @@ python deep_research.py --email "ceo@company.com" --json -o raw_data.json
 
 ### Nyne.ai
 - Check https://nyne.ai for current pricing
+- See [API documentation](https://api.nyne.ai/documentation) for endpoint details
 - Each research uses 1-3 API calls depending on available data
 
 ### LLM Costs (for dossier generation)
