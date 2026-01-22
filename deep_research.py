@@ -1010,6 +1010,16 @@ Full name, role, company, location, age estimate, birthday if available.
 Personal details: address, phone, car, domain names owned.
 Self-description: How do they describe themselves in their bio? What does this reveal?
 
+**Email Addresses (list ALL found):**
+- Primary email
+- Work emails
+- Personal emails
+- All alternative emails from altemails field
+
+**Social Profiles (list ALL with URLs):**
+Include every social profile found - Twitter, LinkedIn, Instagram, Strava, Pinterest, Flickr, GitHub, Foursquare, AngelList, etc.
+Format as: Platform: URL
+
 ## 2. PERSONAL LIFE & HOBBIES (CRITICAL SECTION)
 This is the section that makes the dossier special. Go DEEP on:
 
@@ -1186,7 +1196,15 @@ How to connect with this person:
 - Personal interests to reference (shows you did your homework)
 - What NOT to do
 
-This dossier should make someone feel like they already KNOW this person before ever meeting them.'''
+This dossier should make someone feel like they already KNOW this person before ever meeting them.
+
+CRITICAL INSTRUCTIONS:
+- You MUST include ALL 13 sections listed above. Do not skip or combine sections.
+- Section 6 (Interest Cluster Deep Dive) MUST include ALL subsections (Sports, Entertainment, Causes, Tech, Geographic, Personal Network, Unexpected) with SPECIFIC HANDLES as evidence.
+- Key Relationships MUST list exactly 25 accounts.
+- Conversation Starters MUST include 30+ hooks divided into categories.
+- Be EXHAUSTIVE. This should be 400+ lines of detailed analysis.
+- Do NOT summarize or condense. Include all details from the cluster analyses.'''
 
 
 # ============================================================================
