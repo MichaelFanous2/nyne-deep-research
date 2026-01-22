@@ -27,9 +27,26 @@ Comprehensive person intelligence tool that combines multiple data sources into 
 Given an email and/or LinkedIn URL, this tool:
 
 1. **Enriches** the person's profile (name, career, education, social profiles, recent posts)
-2. **Analyzes** who they follow on Twitter/X (psychographic profiling)
+2. **Analyzes** who they follow on Twitter/X and Instagram (psychographic profiling)
 3. **Searches** for articles, podcasts, and press mentions
-4. **Generates** an AI-powered dossier with conversation starters and insights
+4. **Runs deep cluster analysis** - 5 parallel LLM calls to cluster followed accounts by:
+   - Sports & Fitness (cycling, golf, basketball, etc.)
+   - Entertainment & Culture (music, comedy, food, podcasts)
+   - Causes & Politics (political leanings, social causes)
+   - Personal Network (low-follower friends, family, colleagues)
+   - Hidden Interests (unexpected follows, guilty pleasures)
+5. **Generates** an AI-powered dossier with evidence-based insights
+
+### How It Works
+
+```
+API Calls (3)           LLM Calls (13)                    Output (1)
+─────────────           ──────────────                    ──────────
+Enrichment    ────┐
+Following     ────┼───► 7 Batch Analyses (75 accounts each)
+Articles      ────┘     5 Cluster Analyses (parallel)    ───► dossier.md
+                        1 Final Synthesis
+```
 
 ## Quick Start
 
@@ -167,17 +184,29 @@ result = research_person(
 
 ### Dossier (Default)
 
-The tool generates a markdown dossier with these sections:
+The tool generates a comprehensive markdown dossier with 13 sections:
 
-1. **Identity Snapshot** - Name, role, location, age estimate
-2. **Career DNA** - Complete trajectory and "superpower"
-3. **Psychographic Profile** - Archetypes, values, interests (from Twitter follows)
-4. **Hidden Interests** - Unexpected follows, hobbies, personal interests
-5. **Key Influencers** - Top accounts they follow
-6. **Content Analysis** - Topics they post about, tone, recent wins/frustrations
-7. **Conversation Starters** - 15+ specific hooks for outreach
-8. **Warnings & Landmines** - Topics to avoid
-9. **"Creepy Good" Insights** - Patterns most people miss
+1. **Identity Snapshot** - Name, role, location, age, personal details (address, phone, car)
+2. **Personal Life & Hobbies** - Active hobbies, entertainment tastes, causes, family indicators
+3. **Career DNA** - Complete trajectory with insights for each role, their "superpower"
+4. **Psychographic Profile** - Archetypes, values, beliefs, political leanings
+5. **Social Graph Analysis** - Overview of professional network, personal interests, inner circle
+6. **Interest Cluster Deep Dive** - Evidence-based analysis with specific handles:
+   - Sports & Fitness (which sports, participant vs spectator)
+   - Music & Entertainment (genres, artists, podcasts)
+   - Causes & Politics (political figures, social causes)
+   - Intellectual Interests (books, self-improvement)
+   - Tech Interests (crypto, AI, consumer tech)
+   - Geographic Ties (local community, hometown)
+   - Personal Network (low-follower friends, family)
+   - Unexpected/Surprising Follows
+7. **Content & Voice Analysis** - Topics, communication style, recent wins/frustrations
+8. **Key Relationships (Top 25)** - Most important accounts with relationship context
+9. **Conversation Starters (30+)** - Professional hooks, personal interest hooks, shared experiences
+10. **Recommendations & How Others See Them** - Patterns from LinkedIn recommendations
+11. **Warnings & Landmines** - Sensitive topics, career sore spots, political hot buttons
+12. **"Creepy Good" Insights** - Non-obvious patterns, cross-referenced discoveries
+13. **Approach Strategy** - Best angle, shared connections, topics to reference
 
 ### Raw JSON (--json flag)
 
@@ -331,26 +360,15 @@ python deep_research.py --email "ceo@company.com" --llm anthropic
 
 ### Supported Models
 
-| Provider | Model | Set via |
-|----------|-------|---------|
-| **Gemini** | `gemini-3-flash-preview` | `GEMINI_API_KEY` |
-| **OpenAI** | `gpt-4o` | `OPENAI_API_KEY` |
-| **Anthropic** | `claude-sonnet-4` | `ANTHROPIC_API_KEY` |
+| Provider | Model | Max Output Tokens | Set via |
+|----------|-------|-------------------|---------|
+| **Gemini** | `gemini-3-flash-preview` | 65,536 | `GEMINI_API_KEY` |
+| **OpenAI** | `gpt-4o` | 16,384 | `OPENAI_API_KEY` |
+| **Anthropic** | `claude-sonnet-4` | 64,000 | `ANTHROPIC_API_KEY` |
 
 ### Changing the Model
 
-To use a different model, edit the model name in `deep_research.py`:
-
-```python
-# Gemini (line ~517)
-model = genai.GenerativeModel('gemini-3-flash-preview')  # Change this
-
-# OpenAI (line ~535)
-model="gpt-4o"  # Change to gpt-4-turbo, gpt-3.5-turbo, etc.
-
-# Anthropic (line ~554)
-model="claude-sonnet-4-20250514"  # Change to claude-opus-4, etc.
-```
+To use a different model, edit the model name in `deep_research.py` (search for `_call_gemini`, `_call_openai`, or `_call_anthropic` functions).
 
 ### Skip LLM (Raw Data Only)
 ```bash
@@ -364,9 +382,16 @@ python deep_research.py --email "ceo@company.com" --json -o raw_data.json
 - Each research uses 1-3 API calls depending on available data
 
 ### LLM Costs (for dossier generation)
-- **Gemini 2.0 Flash**: ~$0.01-0.03 per dossier (recommended)
-- **GPT-4o**: ~$0.10-0.30 per dossier
-- **Claude Sonnet**: ~$0.05-0.15 per dossier
+
+Each dossier uses **13 LLM calls**:
+- 7 batch analyses (analyzing ~75 followed accounts each)
+- 5 cluster analyses (sports, entertainment, causes, network, hidden interests)
+- 1 final synthesis
+
+Estimated costs per dossier:
+- **Gemini 3 Flash**: ~$0.05-0.15 (recommended - fast and cheap)
+- **GPT-4o**: ~$0.50-1.50 per dossier
+- **Claude Sonnet**: ~$0.30-0.80 per dossier
 
 Use `--json` flag to skip LLM costs and get raw data only.
 

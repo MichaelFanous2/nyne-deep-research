@@ -555,7 +555,7 @@ Now write the most thorough dossier possible. Be exhaustive. Go deep.'''
 # BATCH ANALYSIS PROMPTS
 # ============================================================================
 
-BATCH_ANALYSIS_PROMPT = '''You are analyzing a batch of social media accounts that a person follows.
+BATCH_ANALYSIS_PROMPT = '''You are a behavioral psychologist analyzing WHO someone really is based on who they follow.
 
 PERSON CONTEXT:
 Name: {person_name}
@@ -565,111 +565,628 @@ Company: {person_company}
 ANALYZE THESE {batch_size} ACCOUNTS THEY FOLLOW (Batch {batch_num} of {total_batches}):
 {batch_data}
 
-For EACH account, provide:
-1. Category (VC, Founder, AI/Tech, Media, Sports, Politics, Personal Friend, etc.)
-2. Why this person likely follows them (relationship, shared interest, aspiration)
-3. Notable insight (if any) - what does following this account reveal?
-4. Follower count and verification status
+For EACH account, categorize and analyze:
+1. **Category** - Be specific:
+   - Professional: VC, Founder, Tech Executive, AI Researcher
+   - Personal Interest: Sports (which sport?), Fitness, Food/Restaurants, Travel, Fashion, Art, Music
+   - Entertainment: Comedy, Celebrities, TV Shows, Movies, Gaming
+   - Hobbies: Photography, Cooking, Golf, Running, Cycling, Hiking, Cars
+   - Causes: Social Justice, Climate, Politics (what leaning?), Charity
+   - Personal Connection: Family member? College friend? Former colleague?
 
-Then provide a BATCH SUMMARY:
-- Key themes in this batch
-- Most notable/surprising follows
-- Patterns you observe
-- Potential conversation hooks based on these follows
+2. **What this reveals about them personally** - Go beyond the obvious:
+   - Does this suggest a hobby they actively participate in?
+   - A passion they might not talk about professionally?
+   - A hidden side of their personality?
+   - Childhood interests? Geographic ties?
 
-Be thorough and specific. Use exact handles and follower counts.'''
+3. **Personal insight** - The "getting to know them" angle:
+   - Would you expect someone in their role to follow this?
+   - What does this say about their personality/values?
+   - How might this inform a personal conversation?
 
-SYNTHESIS_PROMPT = '''You are an elite intelligence analyst creating the DEFINITIVE dossier on this person.
+4. **Low-follower accounts** (<5000 followers) - These are GOLD for personal insights:
+   - Likely personal friends, family, or niche interests
+   - What does their bio reveal about the relationship?
+
+BATCH SUMMARY:
+- **Personal interests discovered** (hobbies, sports, entertainment)
+- **Unexpected/surprising follows** (things you wouldn't expect)
+- **Personality indicators** (introvert/extrovert, serious/playful, etc.)
+- **Life outside work** (family, causes, communities)
+- **Conversation hooks** for getting to know them personally (not professionally)
+
+Focus on the HUMAN behind the professional. What makes them tick?'''
+
+# ============================================================================
+# CLUSTER ANALYSIS PROMPTS - Run in parallel for deep interest mapping
+# ============================================================================
+
+SPORTS_FITNESS_CLUSTER_PROMPT = '''You are analyzing someone's Twitter/social following list to understand their SPORTS & FITNESS interests.
+
+PERSON: {person_name} ({person_role} at {person_company})
+
+HERE IS EVERYONE THEY FOLLOW:
+{all_following}
+
+YOUR TASK: Find ALL sports and fitness related accounts and analyze them.
+
+## CYCLING
+List every cycling-related account they follow:
+- Pro cyclists, cycling teams
+- Cycling media/publications
+- Local bike shops, cycling clubs
+- Cycling apps (Strava, etc.)
+- Cycling events/races
+
+**Accounts Found:** [list all handles]
+**Analysis:** Are they a casual rider or serious cyclist? Do they race? Road or mountain?
+**Evidence-based conclusion:** "Follows X, Y, Z therefore..."
+
+## GOLF
+List every golf-related account:
+- Pro golfers, PGA Tour
+- Golf courses, country clubs
+- Golf media, equipment brands
+- Golf podcasts/personalities
+
+**Accounts Found:** [list all handles]
+**Analysis:** Do they play? What's their likely skill level? Member of clubs?
+
+## RUNNING/MARATHON
+- Running accounts, marathon organizers
+- Running apps, coaches
+- Track and field
+
+**Accounts Found:** [list all handles]
+**Analysis:** Casual jogger or marathon runner?
+
+## TEAM SPORTS
+### Basketball/NBA
+**Accounts Found:** [list all handles]
+**Analysis:** Which teams? Player or just fan?
+
+### Football/NFL
+**Accounts Found:** [list all handles]
+**Analysis:** Fantasy player? Which teams?
+
+### Baseball/MLB
+**Accounts Found:** [list all handles]
+
+### Soccer
+**Accounts Found:** [list all handles]
+
+## OTHER SPORTS
+- Tennis, F1, Surfing, Skiing, etc.
+**Accounts Found:** [list all handles]
+
+## FITNESS/GYM
+- Fitness influencers, gyms, trainers
+- CrossFit, yoga, pilates
+- Nutrition/diet accounts
+
+**Accounts Found:** [list all handles]
+**Analysis:** How fitness-focused are they?
+
+## FINAL SPORTS PROFILE
+Based on all the above, write a comprehensive sports/fitness profile:
+- Which sports do they ACTIVELY PARTICIPATE in vs just watch?
+- Estimated activity level (couch potato / weekend warrior / serious athlete)
+- Best sports-related conversation starters
+- Specific accounts to reference in conversation'''
+
+ENTERTAINMENT_CULTURE_CLUSTER_PROMPT = '''You are analyzing someone's following list to understand their ENTERTAINMENT & CULTURE tastes.
+
+PERSON: {person_name} ({person_role} at {person_company})
+
+HERE IS EVERYONE THEY FOLLOW:
+{all_following}
+
+YOUR TASK: Find ALL entertainment and culture accounts and analyze their tastes.
+
+## MUSIC
+List ALL music-related accounts:
+- Artists/bands they follow (list genre for each)
+- Music venues, festivals
+- Music industry people, labels
+- Music streaming/discovery accounts
+- DJs, producers
+
+**Accounts Found:** [list all with genre]
+**Music Taste Profile:** What genres? Mainstream or indie? Do they likely attend concerts?
+**Conversation hooks:** Specific artists or venues to mention
+
+## COMEDY
+- Comedians they follow
+- Comedy shows, podcasts
+- Humor/satire accounts
+
+**Accounts Found:** [list all handles]
+**Humor Style:** Dry? Sarcastic? Political satire? Absurdist?
+
+## TV & FILM
+- Actors, directors
+- TV shows, streaming services
+- Film critics, movie accounts
+- Entertainment news
+
+**Accounts Found:** [list all handles]
+**Viewing Habits:** What shows might they watch? Binge-watcher?
+
+## PODCASTS
+- Podcast hosts they follow
+- Podcast networks
+- Audio content creators
+
+**Accounts Found:** [list all handles]
+**Podcast Preferences:** Business? Comedy? True crime? Interview shows?
+
+## BOOKS & READING
+- Authors they follow
+- Book reviewers, literary accounts
+- Publishers, bookstores
+
+**Accounts Found:** [list all handles]
+**Reading Profile:** Fiction or non-fiction? What genres?
+
+## FOOD & RESTAURANTS
+- Chefs, restaurants
+- Food critics, food media
+- Cooking accounts
+- Food delivery, reservation apps
+
+**Accounts Found:** [list all handles]
+**Foodie Level:** Casual eater or serious foodie? Fine dining or casual? Cuisine preferences?
+
+## GAMING
+- Game studios, esports
+- Gaming personalities
+- Specific games
+
+**Accounts Found:** [list all handles]
+
+## FINAL ENTERTAINMENT PROFILE
+Comprehensive summary of their entertainment tastes:
+- What do they do for fun?
+- Cultural sophistication level
+- Entertainment conversation starters with specific references'''
+
+CAUSES_POLITICS_CLUSTER_PROMPT = '''You are analyzing someone's following list to understand their VALUES, CAUSES, and POLITICAL LEANINGS.
+
+PERSON: {person_name} ({person_role} at {person_company})
+
+HERE IS EVERYONE THEY FOLLOW:
+{all_following}
+
+YOUR TASK: Carefully analyze their follows to understand their values and political stance.
+
+## POLITICAL FIGURES
+List ALL politicians, political commentators, political organizations:
+
+**Democrats/Liberal accounts:** [list all]
+**Republicans/Conservative accounts:** [list all]
+**Independent/Centrist accounts:** [list all]
+**Political media they follow:** [list all]
+
+**Political Lean Assessment:** Based on the PATTERN of follows, what is their likely political orientation?
+(Be specific - not just "liberal" but "progressive Democrat" or "moderate liberal" etc.)
+
+## SOCIAL CAUSES
+### Racial Justice / Civil Rights
+**Accounts Found:** [list all]
+**Level of Engagement:** Casual supporter or active advocate?
+
+### Climate / Environment
+**Accounts Found:** [list all]
+
+### LGBTQ+ Rights
+**Accounts Found:** [list all]
+
+### Women's Rights / Feminism
+**Accounts Found:** [list all]
+
+### Immigration
+**Accounts Found:** [list all]
+
+### Economic Justice / Labor
+**Accounts Found:** [list all]
+
+### Other Causes
+**Accounts Found:** [list all]
+
+## NONPROFIT / CHARITY
+- Charitable organizations
+- Volunteering organizations
+- Philanthropic accounts
+
+**Accounts Found:** [list all]
+**Causes They Support:** What do they care about?
+
+## RELIGIOUS / SPIRITUAL
+- Religious leaders, organizations
+- Spiritual accounts
+- Meditation, mindfulness
+
+**Accounts Found:** [list all]
+**Spiritual Profile:** Religious? Spiritual but not religious? Secular?
+
+## LOCAL COMMUNITY
+- Local politicians
+- Local news
+- Community organizations
+- Local businesses, events
+
+**Accounts Found:** [list all]
+**Community Engagement:** How connected are they to their local community?
+
+## VALUES SUMMARY
+Based on all the above:
+- Core values they hold
+- Issues they likely care deeply about
+- Political conversation landmines to avoid
+- Safe ways to connect on shared values'''
+
+PERSONAL_NETWORK_CLUSTER_PROMPT = '''You are analyzing someone's following list to map their PERSONAL NETWORK and RELATIONSHIPS.
+
+PERSON: {person_name} ({person_role} at {person_company})
+
+HERE IS EVERYONE THEY FOLLOW:
+{all_following}
+
+YOUR TASK: Find accounts that reveal PERSONAL relationships (not just professional).
+
+## LOW-FOLLOWER ACCOUNTS (<3000 followers)
+These are likely real personal connections. For EACH one:
+
+**Handle | Follower Count | Bio | Likely Relationship**
+(List ALL accounts with <3000 followers)
+
+For each, infer the relationship type:
+- College friend (check if same school mentioned)
+- Former colleague (check company mentions)
+- Family member (same last name?)
+- Childhood friend
+- Hobby buddy
+- Neighbor/local friend
+- Unknown personal connection
+
+## FORMER COLLEAGUES
+Based on their career history, find people from:
+- Loopt
+- Shopkick
+- Dropbox
+- Greylock
+- Script Capital/122 West
+- South Park Commons
+
+**Accounts Found from each company:** [list]
+
+## STANFORD NETWORK
+- Stanford alumni they follow
+- Stanford professors, programs
+- Stanford sports, organizations
+
+**Accounts Found:** [list all]
+**Stanford Involvement Level:** Casual alum or deeply connected?
+
+## FAMILY INDICATORS
+- Accounts with same last name
+- "Family" or parenting accounts
+- Children's content (suggests they have kids)
+- Spouse/partner indicators
+
+**Evidence of Family:** [list any evidence]
+**Family Status Assessment:** Married? Kids? Close family ties?
+
+## INNER CIRCLE
+Based on interaction patterns and low-follower accounts, who are likely their closest friends?
+
+**Probable Inner Circle:** [list 5-10 most likely close personal connections with evidence]
+
+## RELATIONSHIP MAP SUMMARY
+- Who are their real friends (not just professional contacts)?
+- What communities do they belong to personally?
+- Family situation insights
+- Best personal connections to reference or ask about'''
+
+HIDDEN_INTERESTS_CLUSTER_PROMPT = '''You are looking for SURPRISING and UNEXPECTED follows that reveal hidden sides of this person.
+
+PERSON: {person_name} ({person_role} at {person_company})
+
+HERE IS EVERYONE THEY FOLLOW:
+{all_following}
+
+YOUR TASK: Find the follows that DON'T FIT their professional profile. What do these reveal?
+
+## UNEXPECTED FOLLOWS
+List accounts that seem surprising for a {person_role}:
+
+For each unexpected follow:
+**Handle:**
+**Why it's unexpected:**
+**What it might reveal:**
+
+## NICHE INTERESTS
+Accounts related to very specific hobbies or interests:
+- Unusual hobbies
+- Niche communities
+- Obscure interests
+
+**Accounts Found:** [list all]
+**What these reveal about them:**
+
+## QUIRKY/FUN FOLLOWS
+- Humor accounts
+- Meme accounts
+- Weird or absurdist content
+- Parody accounts
+
+**Accounts Found:** [list all]
+**Sense of Humor Profile:**
+
+## GUILTY PLEASURES
+- Reality TV
+- Celebrity gossip
+- Pop culture they might not admit to
+- "Lowbrow" entertainment
+
+**Accounts Found:** [list all]
+
+## BOT/UTILITY FOLLOWS
+- Weather bots
+- News bots
+- Local alert accounts
+- Utility accounts
+
+**Accounts Found:** [list all]
+**What these reveal:** (e.g., earthquake bot = cares about local SF events)
+
+## ASPIRATIONAL FOLLOWS
+Accounts they follow that suggest who they WANT to be:
+- Lifestyle accounts
+- Successful people in different fields
+- Dream destinations, experiences
+
+**Accounts Found:** [list all]
+**Aspirational Profile:** What life do they aspire to?
+
+## CREEPY-GOOD INSIGHTS
+The most surprising discoveries that would make them think "how did you know that?":
+
+1. [Insight with evidence]
+2. [Insight with evidence]
+3. [Insight with evidence]
+4. [Insight with evidence]
+5. [Insight with evidence]
+
+## HIDDEN INTERESTS SUMMARY
+The complete picture of who this person is BEYOND their professional identity:
+- Secret hobbies
+- Personality quirks
+- Unexpected passions
+- Things they probably don't talk about at work'''
+
+SYNTHESIS_PROMPT = '''You are creating a COMPLETE profile of this person - not just their professional life, but WHO THEY ARE as a human being.
 
 You have access to:
-1. Their full profile/enrichment data
+1. Their full profile/enrichment data (including social profiles like Strava, Pinterest, etc.)
 2. Detailed analyses of EVERY account they follow (analyzed in batches)
-3. Articles and press mentions
+3. DEEP CLUSTER ANALYSES - specialized analyses of their interests by category
+4. Articles and press mentions
+5. Personal details (address, car, phone, family connections)
 
-YOUR TASK: Synthesize all this research into the most comprehensive, insightful dossier ever written.
+YOUR TASK: Create the most comprehensive dossier that would help someone truly KNOW this person - their passions, quirks, what makes them laugh, what they care about, who they spend time with.
 
-## ENRICHMENT DATA (Profile, Career, Posts):
+## ENRICHMENT DATA (Profile, Career, Social Profiles, Posts):
 {enrichment_data}
 
-## FOLLOWING ANALYSES (Deep analysis of everyone they follow):
+## FOLLOWING BATCH ANALYSES:
 {following_analyses}
+
+## SPORTS & FITNESS CLUSTER ANALYSIS:
+{sports_cluster}
+
+## ENTERTAINMENT & CULTURE CLUSTER ANALYSIS:
+{entertainment_cluster}
+
+## CAUSES & POLITICS CLUSTER ANALYSIS:
+{causes_cluster}
+
+## PERSONAL NETWORK CLUSTER ANALYSIS:
+{network_cluster}
+
+## HIDDEN INTERESTS CLUSTER ANALYSIS:
+{hidden_cluster}
 
 ## ARTICLES & PRESS:
 {articles_data}
 
 ---
 
-Now write an EXHAUSTIVE dossier with these sections:
+Write an EXHAUSTIVE dossier with these sections:
 
 ## 1. IDENTITY SNAPSHOT
-Full name, role, company, location, age estimate. Include personal details (address, phone, car if available).
+Full name, role, company, location, age estimate, birthday if available.
+Personal details: address, phone, car, domain names owned.
+Self-description: How do they describe themselves in their bio? What does this reveal?
 
-## 2. CAREER DNA
+## 2. PERSONAL LIFE & HOBBIES (CRITICAL SECTION)
+This is the section that makes the dossier special. Go DEEP on:
+
+**Active Hobbies & Sports:**
+- Look at their social profiles (Strava = cycling/running, Pinterest = interests, Flickr = photography)
+- Sports accounts they follow - do they PLAY or just watch?
+- Fitness level/activity (marathon runner? casual gym goer? golfer?)
+- Weekend activities - hiking, skiing, surfing?
+
+**Entertainment & Culture:**
+- Music tastes (who do they follow? What concerts might they attend?)
+- TV shows, movies, books they might enjoy
+- Comedy they like (podcasts, comedians)
+- Food and restaurants (any chef follows? foodie accounts?)
+
+**Personal Passions:**
+- Causes they care about (volunteering data, activist follows)
+- Communities they belong to (alumni networks, local groups)
+- Religious/spiritual interests
+- Creative pursuits (writing, art, photography)
+
+**Life Outside Work:**
+- Family indicators (children? pets? married?)
+- Where they spend time (second homes? vacation spots?)
+- Friend circles (low-follower personal accounts)
+- Hometown/geographic ties
+
+**Quirks & Personality:**
+- How do they describe themselves? ("lover of life's quirks")
+- Sense of humor style
+- Introvert or extrovert signals?
+- Morning person or night owl?
+
+## 3. CAREER DNA
 Complete trajectory with dates. For EACH role:
 - What they actually did
-- Why they made this move (infer from timing/context)
+- Why they made this move
 - Key relationships formed
 Their "superpower" - what makes them uniquely valuable.
 
-## 3. PSYCHOGRAPHIC DEEP DIVE
+## 4. PSYCHOGRAPHIC PROFILE
 Based on the following analyses, explain WHO this person is:
-- Core identity/archetypes
-- Values and beliefs (with evidence)
+- Core identity/archetypes (The Builder? The Mentor? The Explorer?)
+- Values and beliefs (with specific evidence)
 - Aspirations (who do they want to be?)
-- Political/social leanings
+- Political/social leanings (with evidence from follows)
 - Professional tribes they belong to
 
-## 4. FOLLOWING ANALYSIS SYNTHESIS
-Combine all batch analyses into:
-- COMPLETE category breakdown with handles
-- The most notable follows and why
-- Unexpected/hidden interest follows
-- Low-follower accounts (likely personal relationships)
-- Patterns across all follows
+## 5. SOCIAL GRAPH ANALYSIS (BRIEF OVERVIEW)
+Quick summary of their social graph:
+- **Professional Network**: VCs, founders, executives
+- **Personal Interest Graph**: Sports, hobbies, entertainment
+- **Inner Circle**: Low-follower accounts (likely real friends/family)
 
-## 5. CONTENT & VOICE ANALYSIS
+## 6. INTEREST CLUSTER DEEP DIVE (CRITICAL - BE EXHAUSTIVE)
+This is the most important section. For EACH interest area, provide:
+1. The specific handles they follow (list ALL relevant ones)
+2. Evidence-based conclusion about their level of interest
+3. Whether they're a participant or just a spectator
+
+**FORMAT FOR EACH CLUSTER:**
+```
+### [INTEREST NAME]
+**Accounts Followed:** @handle1, @handle2, @handle3, @handle4, @handle5...
+**Evidence:** [What these follows reveal]
+**Conclusion:** [Casual fan / Serious enthusiast / Active participant / Professional interest]
+**Conversation Angle:** [How to use this in conversation]
+```
+
+**REQUIRED CLUSTERS TO ANALYZE (if accounts exist):**
+
+### SPORTS & FITNESS
+Break down by sport:
+- **Cycling**: List ALL cycling-related follows. Are they on Strava? Do they follow pro cyclists, local bike shops, cycling media?
+- **Golf**: List ALL golf follows. Country clubs? Pro golfers? Golf media?
+- **Basketball/NBA**: Teams, players, analysts they follow
+- **Football/NFL**: Teams, players, fantasy sports?
+- **Running/Marathon**: Running accounts, race organizers?
+- **Other sports**: Tennis, soccer, F1, etc.
+
+### MUSIC & ENTERTAINMENT
+- **Music**: Artists, genres, venues, music industry people. What does this say about their taste?
+- **Podcasts**: Which podcast hosts/shows do they follow?
+- **Comedy**: Comedians, comedy shows, humor accounts
+- **TV/Film**: Actors, shows, critics, streaming services
+- **Gaming**: Any gaming follows?
+
+### FOOD & LIFESTYLE
+- **Restaurants/Food**: Chefs, food critics, restaurant accounts, food media
+- **Travel**: Travel accounts, destinations, airlines
+- **Fashion**: Brands, designers, fashion media
+- **Home/Design**: Interior design, architecture
+
+### CAUSES & POLITICS
+- **Political Figures**: Which politicians do they follow? What does the pattern suggest?
+- **Social Causes**: Nonprofits, activists, social justice organizations
+- **Climate/Environment**: Environmental accounts
+- **Local Issues**: Local news, local politicians, community accounts
+
+### INTELLECTUAL INTERESTS
+- **Books/Reading**: Authors, book clubs, literary accounts
+- **Science**: Scientists, science communicators
+- **Philosophy/Spirituality**: Thinkers, spiritual leaders
+- **Self-Improvement**: Productivity, habits, mental health
+
+### TECH INTERESTS (Beyond Work)
+- **Crypto/Web3**: Which projects, founders, thought leaders?
+- **AI**: Beyond work - personal interest in AI?
+- **Consumer Tech**: Product Hunt, gadget reviewers
+- **Specific Platforms**: Deep interest in any particular platform?
+
+### GEOGRAPHIC TIES
+- **Local Community**: Local news, local businesses, local politicians
+- **Hometown**: Any accounts tied to where they grew up?
+- **Other Cities**: Interest in other locations?
+
+### PERSONAL NETWORK
+- **Low-Follower Accounts (<2000 followers)**: These are likely real friends, family, or niche interests
+  - List each one with their bio
+  - Infer the relationship (college friend? former colleague? family?)
+
+### UNEXPECTED/SURPRISING FOLLOWS
+- Accounts that don't fit their professional profile
+- What do these reveal about hidden interests?
+
+For EACH cluster, I want to see the ACTUAL HANDLES they follow as evidence.
+
+## 7. CONTENT & VOICE ANALYSIS
 From their posts:
-- Topics they care about
+- Topics they care about (professional AND personal)
 - Communication style and tone
-- Recent wins (with dates and quotes)
-- Frustrations expressed (with quotes)
+- Sense of humor (examples)
+- Recent wins and celebrations
+- Frustrations and complaints
 - Strong opinions they've stated
 
-## 6. KEY RELATIONSHIPS (Top 25)
+## 8. KEY RELATIONSHIPS (Top 25)
 The 25 most important accounts they follow, with:
 - Handle, name, follower count
-- Likely nature of relationship
-- Why this matters for approaching them
+- Nature of relationship (mentor? friend? colleague? family?)
+- Why this matters for understanding them
 
-## 7. CONVERSATION STARTERS (25+)
-Highly specific hooks referencing:
-- Exact posts with dates
-- Specific accounts they follow
-- Career history details
-- Hidden interests discovered
-- Recent company news
+## 9. CONVERSATION STARTERS (30+)
+Divide into categories:
+**Professional hooks** (5-10)
+**Personal interest hooks** (10-15) - hobbies, sports, entertainment
+**Shared experience hooks** (5-10) - places, schools, companies
+**Current events hooks** (5) - recent posts, news about them
 
-## 8. WARNINGS & LANDMINES
-- Sensitive topics
-- Potential competitors/enemies
+## 10. RECOMMENDATIONS & HOW OTHERS SEE THEM
+From LinkedIn recommendations:
+- How do colleagues describe them?
+- What qualities do people highlight?
+- Any patterns in the praise?
+
+## 11. WARNINGS & LANDMINES
+- Sensitive topics to avoid
+- Career sore spots (failures, missed opportunities)
 - Political hot buttons
-- Career sore spots
+- Personal boundaries
 
-## 9. "CREEPY GOOD" INSIGHTS
+## 12. "CREEPY GOOD" INSIGHTS
 The insights that make them think "how did they know that?":
-- Non-obvious patterns
+- Non-obvious patterns (e.g., follows earthquake bot = interested in SF local news)
 - Cross-referenced discoveries
-- Personal details
-- Predictive insights about their behavior
+- Personal details most wouldn't find
+- Behavioral predictions
 
-## 10. APPROACH STRATEGY
+## 13. APPROACH STRATEGY
 How to connect with this person:
-- Best angle/framing
+- Best angle (professional vs personal)
 - Shared connections to mention
 - Topics that will resonate
-- What to avoid
+- Personal interests to reference (shows you did your homework)
+- What NOT to do
 
-Go DEEP. Be SPECIFIC. This should be the most thorough research they've ever seen.'''
+This dossier should make someone feel like they already KNOW this person before ever meeting them.'''
 
 
 # ============================================================================
@@ -684,8 +1201,8 @@ def _call_gemini(prompt: str) -> Optional[str]:
         import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel(
-            'gemini-2.0-flash',
-            generation_config={"temperature": 0.7, "max_output_tokens": 32768}
+            'gemini-3-flash-preview',
+            generation_config={"temperature": 0.7, "max_output_tokens": 65536}
         )
         response = model.generate_content(prompt)
         return response.text
@@ -704,7 +1221,7 @@ def _call_openai(prompt: str) -> Optional[str]:
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=16000
+            max_tokens=16384
         )
         return response.choices[0].message.content
     except Exception:
@@ -720,7 +1237,7 @@ def _call_anthropic(prompt: str) -> Optional[str]:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=16000,
+            max_tokens=64000,
             messages=[{"role": "user", "content": prompt}]
         )
         return response.content[0].text
@@ -843,7 +1360,83 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
         following_analyses.sort(key=lambda x: x[0])
         following_analyses = [a[1] for a in following_analyses]
 
-    # Prepare synthesis
+    # =========================================================================
+    # PHASE 2: Deep Cluster Analysis
+    # Run 5 specialized clustering prompts in parallel
+    # =========================================================================
+
+    cluster_analyses = {
+        "sports": None,
+        "entertainment": None,
+        "causes": None,
+        "network": None,
+        "hidden": None
+    }
+
+    if all_following:
+        if verbose:
+            print(f"  Running 5 deep cluster analyses in parallel...")
+
+        # Prepare all following data as a string for cluster prompts
+        all_following_str = json.dumps(all_following, indent=2, default=str)
+
+        # Prepare cluster prompts
+        cluster_prompts = {
+            "sports": SPORTS_FITNESS_CLUSTER_PROMPT.format(
+                person_name=person_name,
+                person_role=person_role,
+                person_company=person_company,
+                all_following=all_following_str
+            ),
+            "entertainment": ENTERTAINMENT_CULTURE_CLUSTER_PROMPT.format(
+                person_name=person_name,
+                person_role=person_role,
+                person_company=person_company,
+                all_following=all_following_str
+            ),
+            "causes": CAUSES_POLITICS_CLUSTER_PROMPT.format(
+                person_name=person_name,
+                person_role=person_role,
+                person_company=person_company,
+                all_following=all_following_str
+            ),
+            "network": PERSONAL_NETWORK_CLUSTER_PROMPT.format(
+                person_name=person_name,
+                person_role=person_role,
+                person_company=person_company,
+                all_following=all_following_str
+            ),
+            "hidden": HIDDEN_INTERESTS_CLUSTER_PROMPT.format(
+                person_name=person_name,
+                person_role=person_role,
+                person_company=person_company,
+                all_following=all_following_str
+            )
+        }
+
+        # Run cluster analyses concurrently
+        def run_cluster(args):
+            cluster_name, prompt = args
+            return cluster_name, llm_call(prompt)
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(run_cluster, (name, prompt)): name
+                      for name, prompt in cluster_prompts.items()}
+
+            for future in as_completed(futures):
+                cluster_name, analysis = future.result()
+                if analysis:
+                    cluster_analyses[cluster_name] = analysis
+                    if verbose:
+                        print(f"    ✓ {cluster_name.capitalize()} cluster analyzed")
+                elif verbose:
+                    print(f"    ✗ {cluster_name.capitalize()} cluster failed")
+
+    # =========================================================================
+    # PHASE 3: Final Synthesis
+    # Combine everything into the final dossier
+    # =========================================================================
+
     if verbose:
         print("  Synthesizing final dossier...")
 
@@ -854,6 +1447,11 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
     synthesis_prompt = SYNTHESIS_PROMPT.format(
         enrichment_data=enrichment_str,
         following_analyses=following_str,
+        sports_cluster=cluster_analyses.get("sports") or "No sports analysis available",
+        entertainment_cluster=cluster_analyses.get("entertainment") or "No entertainment analysis available",
+        causes_cluster=cluster_analyses.get("causes") or "No causes analysis available",
+        network_cluster=cluster_analyses.get("network") or "No network analysis available",
+        hidden_cluster=cluster_analyses.get("hidden") or "No hidden interests analysis available",
         articles_data=articles_str
     )
 
