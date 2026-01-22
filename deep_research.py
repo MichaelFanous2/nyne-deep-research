@@ -973,7 +973,7 @@ You have access to:
 2. Detailed analyses of EVERY account they follow (analyzed in batches)
 3. DEEP CLUSTER ANALYSES - specialized analyses of their interests by category
 4. Articles and press mentions
-5. Personal details (address, car, phone, family connections)
+5. Personal details (location, family connections)
 
 YOUR TASK: Create the most comprehensive dossier that would help someone truly KNOW this person - their passions, quirks, what makes them laugh, what they care about, who they spend time with.
 
@@ -1007,7 +1007,7 @@ Write an EXHAUSTIVE dossier with these sections:
 
 ## 1. IDENTITY SNAPSHOT
 Full name, role, company, location, age estimate, birthday if available.
-Personal details: address, phone, car, domain names owned.
+Personal details: location, domain names owned.
 Self-description: How do they describe themselves in their bio? What does this reveal?
 
 **Email Addresses (list ALL found):**
@@ -1225,6 +1225,7 @@ def _call_gemini(prompt: str) -> Optional[str]:
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
+        print(f"    ⚠ Gemini error: {e}")
         return None
 
 
