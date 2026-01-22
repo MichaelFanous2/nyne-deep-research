@@ -1,0 +1,17 @@
+# Nyne Deep Research - Dependencies
+
+# Core dependencies (required)
+requests>=2.28.0
+python-dotenv>=1.0.0
+
+# LLM providers (install at least one for dossier generation)
+# If you only need raw JSON data, these are optional
+
+# Google Gemini (recommended)
+google-generativeai>=0.3.0
+
+# OpenAI (alternative)
+# openai>=1.0.0
+
+# Anthropic Claude (alternative)
+# anthropic>=0.18.0
