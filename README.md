@@ -17,7 +17,7 @@ Comprehensive person intelligence tool that combines multiple data sources into 
 **Key guidance for AI agents:**
 1. **Always try to get LinkedIn URL** - It's the richest source of career/education data
 2. **Email improves match accuracy** - Especially for common names
-3. **Twitter URL unlocks psychographics** - If you have it, pass it via `--twitter`
+3. **Twitter or Instagram unlocks psychographics** - Pass via `--twitter` or `--instagram`
 4. **Name/Company are auto-extracted** - No need to pass these manually
 
 ---
@@ -232,6 +232,7 @@ The tool generates a markdown dossier with these sections:
 | **Email** | Match verification, work history, contact info | Confirms identity, especially for common names |
 | **LinkedIn URL** | Full career history, education, posts, bio | Richest professional data source |
 | **Twitter URL** | Who they follow (psychographics), tweets | Reveals interests, values, hidden hobbies |
+| **Instagram URL** | Who they follow (psychographics) | Alternative to Twitter for following analysis |
 
 ### Auto-Discovery
 
@@ -308,6 +309,52 @@ with open('leads.csv') as f:
             generate_dossier_flag=False  # Just get data
         )
         # Process result...
+```
+
+## LLM Configuration
+
+### Auto-Selection (Default)
+The tool automatically selects an LLM based on which API keys are available:
+
+```
+Priority: Gemini → OpenAI → Anthropic
+```
+
+Just set whichever API key(s) you have, and the tool picks the first available.
+
+### Force a Specific LLM
+```bash
+python deep_research.py --email "ceo@company.com" --llm gemini
+python deep_research.py --email "ceo@company.com" --llm openai
+python deep_research.py --email "ceo@company.com" --llm anthropic
+```
+
+### Supported Models
+
+| Provider | Model | Set via |
+|----------|-------|---------|
+| **Gemini** | `gemini-3-flash-preview` | `GEMINI_API_KEY` |
+| **OpenAI** | `gpt-4o` | `OPENAI_API_KEY` |
+| **Anthropic** | `claude-sonnet-4` | `ANTHROPIC_API_KEY` |
+
+### Changing the Model
+
+To use a different model, edit the model name in `deep_research.py`:
+
+```python
+# Gemini (line ~517)
+model = genai.GenerativeModel('gemini-3-flash-preview')  # Change this
+
+# OpenAI (line ~535)
+model="gpt-4o"  # Change to gpt-4-turbo, gpt-3.5-turbo, etc.
+
+# Anthropic (line ~554)
+model="claude-sonnet-4-20250514"  # Change to claude-opus-4, etc.
+```
+
+### Skip LLM (Raw Data Only)
+```bash
+python deep_research.py --email "ceo@company.com" --json -o raw_data.json
 ```
 
 ## Cost Considerations

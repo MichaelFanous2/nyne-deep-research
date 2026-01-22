@@ -34,7 +34,11 @@ import json
 import os
 import sys
 import time
+import warnings
 import requests
+
+# Suppress deprecation warning from google.generativeai
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
@@ -139,7 +143,8 @@ class ResearchInput:
 class ResearchResults:
     """Container for all research data."""
     enrichment: Optional[Dict] = None
-    following: Optional[Dict] = None
+    following_twitter: Optional[Dict] = None
+    following_instagram: Optional[Dict] = None
     articles: Optional[Dict] = None
     errors: Optional[Dict] = None
 
@@ -180,8 +185,10 @@ def submit_enrichment(input_data: ResearchInput, headers: Dict) -> Optional[str]
 
 def submit_following(social_url: str, headers: Dict, max_results: int = 500) -> Optional[str]:
     """
-    Submit request to get who someone follows on Twitter/X.
+    Submit request to get who someone follows on Twitter/X or Instagram.
     Returns request_id or None if failed.
+
+    Note: Instagram only supports 'following' type (not followers or replies).
     """
     if not social_url:
         return None
@@ -308,13 +315,19 @@ def deep_research(input_data: ResearchInput, verbose: bool = True) -> ResearchRe
     elif verbose:
         print("  - Enrichment: skipped (no valid input)")
 
-    # Twitter following
+    # Twitter and/or Instagram following (for psychographics)
     if input_data.twitter_url:
         req_id = submit_following(input_data.twitter_url, headers)
         if req_id:
-            request_ids["following"] = req_id
+            request_ids["following_twitter"] = req_id
             if verbose:
                 print("  ✓ Twitter following request submitted")
+    if input_data.instagram_url:
+        req_id = submit_following(input_data.instagram_url, headers)
+        if req_id:
+            request_ids["following_instagram"] = req_id
+            if verbose:
+                print("  ✓ Instagram following request submitted")
 
     # Article search
     if input_data.name and input_data.company:
@@ -337,7 +350,8 @@ def deep_research(input_data: ResearchInput, verbose: bool = True) -> ResearchRe
 
     endpoint_map = {
         "enrichment": "/person/enrichment",
-        "following": "/person/interactions",
+        "following_twitter": "/person/interactions",
+        "following_instagram": "/person/interactions",
         "articles": "/person/articlesearch"
     }
 
@@ -396,9 +410,11 @@ def deep_research(input_data: ResearchInput, verbose: bool = True) -> ResearchRe
                     if verbose:
                         print("  ✓ Article search: completed")
 
-        # Extract Twitter and fetch following if not already done
-        if "following" not in request_ids:
-            social_profiles = result_data.get("social_profiles", {})
+        # Extract Twitter and Instagram from enrichment if not already provided
+        social_profiles = result_data.get("social_profiles", {})
+
+        # Try Twitter if not already fetched
+        if "following_twitter" not in request_ids and not results.following_twitter:
             twitter = social_profiles.get("twitter", {})
             twitter_url = twitter.get("url")
 
@@ -411,9 +427,27 @@ def deep_research(input_data: ResearchInput, verbose: bool = True) -> ResearchRe
                 if req_id:
                     result = poll_result("/person/interactions", req_id, headers)
                     if result:
-                        results.following = result
+                        results.following_twitter = result
                         if verbose:
-                            print("  ✓ Following: completed")
+                            print("  ✓ Following (Twitter): completed")
+
+        # Try Instagram if not already fetched
+        if "following_instagram" not in request_ids and not results.following_instagram:
+            instagram = social_profiles.get("instagram", {})
+            instagram_url = instagram.get("url")
+
+            if instagram_url:
+                if verbose:
+                    print(f"  → Found Instagram: {instagram_url}")
+                    print("  → Fetching following list...")
+
+                req_id = submit_following(instagram_url, headers)
+                if req_id:
+                    result = poll_result("/person/interactions", req_id, headers)
+                    if result:
+                        results.following_instagram = result
+                        if verbose:
+                            print("  ✓ Following (Instagram): completed")
 
     if verbose:
         print("\n[3/3] Research complete!")
@@ -426,58 +460,224 @@ def deep_research(input_data: ResearchInput, verbose: bool = True) -> ResearchRe
 # LLM DOSSIER GENERATION
 # ============================================================================
 
-DOSSIER_PROMPT = '''You are an elite intelligence analyst. Create an exhaustive, deeply researched dossier on this person.
+DOSSIER_PROMPT = '''You are an elite intelligence analyst creating the most comprehensive dossier ever written on this person. Go DEEP. Leave no stone unturned.
 
 RULES:
-1. EVERY insight MUST be attributed to a specific data point [Source: ...]
-2. Be specific - use exact quotes, dates, company names, follower counts
-3. Focus on "creepy good" insights - things that show deep research
-4. Include conversation starters that reference specific posts/follows/articles
-5. When analyzing the "following" data, cluster the accounts they follow into categories
+1. EVERY insight MUST cite specific evidence [e.g., "follows @handle (450K followers)", "posted on Dec 15: '...'"]
+2. Use EXACT quotes, dates, follower counts, company names - be obsessively specific
+3. Find the "creepy good" insights - patterns that show you did real research
+4. Analyze their Twitter AND Instagram following lists thoroughly - cluster accounts, find unexpected follows
+5. Cross-reference their posts with who they follow to infer deeper meaning
+6. Note low-follower accounts they follow - these reveal personal relationships
 
-STRUCTURE:
+WRITE A DEEPLY RESEARCHED DOSSIER WITH THESE SECTIONS:
+
 ## 1. IDENTITY SNAPSHOT
-- Full name, nicknames, current role, locations, age estimate
+Full name, nicknames, current role, company, location, age estimate, languages. Include personal details like where they live if available.
 
 ## 2. CAREER DNA
-- Complete trajectory with timeline
-- Their "superpower" - what they're known for
+Complete career trajectory with dates. For EACH role, explain:
+- What they actually did (not just title)
+- Why they likely made this move
+- What skills/relationships they gained
+Their "superpower" - what makes them uniquely valuable
 
-## 3. PSYCHOGRAPHIC PROFILE (from Twitter Following)
-- Core archetypes (Builder, Intellectual, Networker, etc.)
-- Interests and values (inferred from who they follow)
-- Cluster analysis: Group accounts into categories (VCs, Founders, Tech, Media, etc.)
+## 3. PSYCHOGRAPHIC PROFILE
+Analyze their Twitter/Instagram following to understand WHO they are:
+- Core archetypes (Builder, Investor, Operator, Intellectual, etc.)
+- Values and motivations (inferred from follows)
+- Political/social leanings (if detectable)
+- CLUSTER ANALYSIS: Group the accounts they follow into categories with specific handles:
+  - VCs & Investors: @handle1, @handle2...
+  - Founders & Operators: ...
+  - AI/Tech Researchers: ...
+  - Media & Journalists: ...
+  - Sports/Entertainment: ...
+  - Politics/Policy: ...
+  - Personal/Friends: ...
 
-## 4. HIDDEN INTERESTS
-- Unexpected follows revealing personal interests
-- Sports, music, hobbies
-- Low-follower accounts (personal relationships)
+## 4. HIDDEN INTERESTS & HOBBIES
+Find the UNEXPECTED follows that reveal who they are outside work:
+- Sports teams, athletes they follow
+- Musicians, comedians, entertainers
+- Niche interests (gaming, cooking, fitness, etc.)
+- Low-follower accounts (<1000) - these are often personal friends or early relationships
+Be specific with handles and why each is notable.
 
-## 5. KEY INFLUENCERS THEY FOLLOW
-- Top 15 most notable accounts with follower counts
+## 5. KEY INFLUENCERS (Top 20)
+The 20 most notable/influential accounts they follow:
+| Handle | Name | Followers | Why They Follow Them |
+For each, explain the likely relationship or reason for following.
 
-## 6. CONTENT ANALYSIS (from posts)
-- Topics they post about
-- Tone and style
-- Recent wins and frustrations
+## 6. CONTENT ANALYSIS
+From their LinkedIn posts and tweets:
+- Topics they post about most
+- Tone and communication style
+- Recent wins they've celebrated (with dates and details)
+- Frustrations or complaints they've expressed
+- Opinions they've stated publicly
+Include EXACT QUOTES from their posts.
 
-## 7. CONVERSATION STARTERS
-15+ specific hooks based on their follows, posts, and career
+## 7. CONVERSATION STARTERS (20+)
+Highly specific hooks based on:
+- Specific posts they made (with dates)
+- Unusual accounts they follow
+- Career transitions
+- Hidden interests
+- Recent news about their company
+Each starter should feel like you KNOW them.
 
 ## 8. WARNINGS & LANDMINES
-- Topics to avoid
+- Topics that might offend them
+- Competitors or people they might dislike
+- Sensitive career history
+- Political hot buttons to avoid
 
 ## 9. "CREEPY GOOD" INSIGHTS
-- Unusual patterns most people miss
+The insights that make them think "how did they know that?":
+- Patterns in who they follow
+- Connections between their posts and follows
+- Personal details buried in the data
+- Things most people would miss
 
-HERE IS THE DATA:
+## 10. SUMMARY: How to Connect With This Person
+A brief synthesis: what they care about, how they think, and the best angle to approach them.
+
+---
+
+HERE IS ALL THE RAW DATA TO ANALYZE:
 {data}
 
-Create the dossier now:'''
+Now write the most thorough dossier possible. Be exhaustive. Go deep.'''
 
 
-def generate_dossier_gemini(data: Dict) -> Optional[str]:
-    """Generate dossier using Google Gemini."""
+# ============================================================================
+# BATCH ANALYSIS PROMPTS
+# ============================================================================
+
+BATCH_ANALYSIS_PROMPT = '''You are analyzing a batch of social media accounts that a person follows.
+
+PERSON CONTEXT:
+Name: {person_name}
+Role: {person_role}
+Company: {person_company}
+
+ANALYZE THESE {batch_size} ACCOUNTS THEY FOLLOW (Batch {batch_num} of {total_batches}):
+{batch_data}
+
+For EACH account, provide:
+1. Category (VC, Founder, AI/Tech, Media, Sports, Politics, Personal Friend, etc.)
+2. Why this person likely follows them (relationship, shared interest, aspiration)
+3. Notable insight (if any) - what does following this account reveal?
+4. Follower count and verification status
+
+Then provide a BATCH SUMMARY:
+- Key themes in this batch
+- Most notable/surprising follows
+- Patterns you observe
+- Potential conversation hooks based on these follows
+
+Be thorough and specific. Use exact handles and follower counts.'''
+
+SYNTHESIS_PROMPT = '''You are an elite intelligence analyst creating the DEFINITIVE dossier on this person.
+
+You have access to:
+1. Their full profile/enrichment data
+2. Detailed analyses of EVERY account they follow (analyzed in batches)
+3. Articles and press mentions
+
+YOUR TASK: Synthesize all this research into the most comprehensive, insightful dossier ever written.
+
+## ENRICHMENT DATA (Profile, Career, Posts):
+{enrichment_data}
+
+## FOLLOWING ANALYSES (Deep analysis of everyone they follow):
+{following_analyses}
+
+## ARTICLES & PRESS:
+{articles_data}
+
+---
+
+Now write an EXHAUSTIVE dossier with these sections:
+
+## 1. IDENTITY SNAPSHOT
+Full name, role, company, location, age estimate. Include personal details (address, phone, car if available).
+
+## 2. CAREER DNA
+Complete trajectory with dates. For EACH role:
+- What they actually did
+- Why they made this move (infer from timing/context)
+- Key relationships formed
+Their "superpower" - what makes them uniquely valuable.
+
+## 3. PSYCHOGRAPHIC DEEP DIVE
+Based on the following analyses, explain WHO this person is:
+- Core identity/archetypes
+- Values and beliefs (with evidence)
+- Aspirations (who do they want to be?)
+- Political/social leanings
+- Professional tribes they belong to
+
+## 4. FOLLOWING ANALYSIS SYNTHESIS
+Combine all batch analyses into:
+- COMPLETE category breakdown with handles
+- The most notable follows and why
+- Unexpected/hidden interest follows
+- Low-follower accounts (likely personal relationships)
+- Patterns across all follows
+
+## 5. CONTENT & VOICE ANALYSIS
+From their posts:
+- Topics they care about
+- Communication style and tone
+- Recent wins (with dates and quotes)
+- Frustrations expressed (with quotes)
+- Strong opinions they've stated
+
+## 6. KEY RELATIONSHIPS (Top 25)
+The 25 most important accounts they follow, with:
+- Handle, name, follower count
+- Likely nature of relationship
+- Why this matters for approaching them
+
+## 7. CONVERSATION STARTERS (25+)
+Highly specific hooks referencing:
+- Exact posts with dates
+- Specific accounts they follow
+- Career history details
+- Hidden interests discovered
+- Recent company news
+
+## 8. WARNINGS & LANDMINES
+- Sensitive topics
+- Potential competitors/enemies
+- Political hot buttons
+- Career sore spots
+
+## 9. "CREEPY GOOD" INSIGHTS
+The insights that make them think "how did they know that?":
+- Non-obvious patterns
+- Cross-referenced discoveries
+- Personal details
+- Predictive insights about their behavior
+
+## 10. APPROACH STRATEGY
+How to connect with this person:
+- Best angle/framing
+- Shared connections to mention
+- Topics that will resonate
+- What to avoid
+
+Go DEEP. Be SPECIFIC. This should be the most thorough research they've ever seen.'''
+
+
+# ============================================================================
+# LLM CALL FUNCTIONS
+# ============================================================================
+
+def _call_gemini(prompt: str) -> Optional[str]:
+    """Make a single Gemini API call."""
     if not GEMINI_API_KEY:
         return None
     try:
@@ -487,21 +687,19 @@ def generate_dossier_gemini(data: Dict) -> Optional[str]:
             'gemini-2.0-flash',
             generation_config={"temperature": 0.7, "max_output_tokens": 32768}
         )
-        prompt = DOSSIER_PROMPT.format(data=json.dumps(data, indent=2, default=str))
         response = model.generate_content(prompt)
         return response.text
-    except Exception:
+    except Exception as e:
         return None
 
 
-def generate_dossier_openai(data: Dict) -> Optional[str]:
-    """Generate dossier using OpenAI."""
+def _call_openai(prompt: str) -> Optional[str]:
+    """Make a single OpenAI API call."""
     if not OPENAI_API_KEY:
         return None
     try:
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_API_KEY)
-        prompt = DOSSIER_PROMPT.format(data=json.dumps(data, indent=2, default=str))
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
@@ -513,14 +711,13 @@ def generate_dossier_openai(data: Dict) -> Optional[str]:
         return None
 
 
-def generate_dossier_anthropic(data: Dict) -> Optional[str]:
-    """Generate dossier using Anthropic Claude."""
+def _call_anthropic(prompt: str) -> Optional[str]:
+    """Make a single Anthropic API call."""
     if not ANTHROPIC_API_KEY:
         return None
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        prompt = DOSSIER_PROMPT.format(data=json.dumps(data, indent=2, default=str))
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=16000,
@@ -531,17 +728,172 @@ def generate_dossier_anthropic(data: Dict) -> Optional[str]:
         return None
 
 
+def _get_llm_caller(llm: str = "auto"):
+    """Get the appropriate LLM call function."""
+    if llm == "gemini" and GEMINI_API_KEY:
+        return _call_gemini, "gemini"
+    elif llm == "openai" and OPENAI_API_KEY:
+        return _call_openai, "openai"
+    elif llm == "anthropic" and ANTHROPIC_API_KEY:
+        return _call_anthropic, "anthropic"
+    elif llm == "auto":
+        if GEMINI_API_KEY:
+            return _call_gemini, "gemini"
+        elif OPENAI_API_KEY:
+            return _call_openai, "openai"
+        elif ANTHROPIC_API_KEY:
+            return _call_anthropic, "anthropic"
+    return None, None
+
+
+def _batch_following_data(following_data: Dict, batch_size: int = 75) -> list:
+    """Split following data into batches."""
+    interactions = following_data.get("result", {}).get("interactions", [])
+    if not interactions:
+        return []
+
+    batches = []
+    for i in range(0, len(interactions), batch_size):
+        batches.append(interactions[i:i + batch_size])
+    return batches
+
+
 def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool = True) -> Optional[str]:
     """
-    Generate intelligent dossier using an LLM.
-    Returns None if no LLM available or generation fails.
+    Generate intelligent dossier using batched LLM calls for deep analysis.
+
+    1. Batch the following lists into chunks
+    2. Run concurrent LLM calls to analyze each batch
+    3. Synthesize all analyses into final dossier
     """
-    # Compile data
+    # Get LLM caller
+    llm_call, llm_name = _get_llm_caller(llm)
+    if not llm_call:
+        if verbose:
+            print("  ⚠ No LLM available. Set GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY")
+        return None
+
+    if verbose:
+        print(f"\n[LLM] Using {llm_name} for deep analysis...")
+
+    # Extract person context from enrichment
+    enrichment = results.enrichment or {}
+    result_data = enrichment.get("result", {})
+    person_name = f"{result_data.get('firstname', '')} {result_data.get('lastname', '')}".strip() or "Unknown"
+    person_role = result_data.get("headline", "Unknown")
+    careers = result_data.get("careers_info", [])
+    person_company = careers[0].get("company_name", "Unknown") if careers else "Unknown"
+
+    # Collect all following data
+    all_following = []
+    if results.following_twitter:
+        twitter_interactions = results.following_twitter.get("result", {}).get("interactions", [])
+        for item in twitter_interactions:
+            item["_source"] = "twitter"
+        all_following.extend(twitter_interactions)
+    if results.following_instagram:
+        ig_interactions = results.following_instagram.get("result", {}).get("interactions", [])
+        for item in ig_interactions:
+            item["_source"] = "instagram"
+        all_following.extend(ig_interactions)
+
+    # Batch the following data
+    batch_size = 75
+    batches = [all_following[i:i + batch_size] for i in range(0, len(all_following), batch_size)] if all_following else []
+
+    following_analyses = []
+
+    if batches:
+        if verbose:
+            print(f"  Analyzing {len(all_following)} followed accounts in {len(batches)} batches...")
+
+        # Prepare batch prompts
+        batch_prompts = []
+        for i, batch in enumerate(batches):
+            batch_data = json.dumps(batch, indent=2, default=str)
+            prompt = BATCH_ANALYSIS_PROMPT.format(
+                person_name=person_name,
+                person_role=person_role,
+                person_company=person_company,
+                batch_size=len(batch),
+                batch_num=i + 1,
+                total_batches=len(batches),
+                batch_data=batch_data
+            )
+            batch_prompts.append((i, prompt))
+
+        # Run batch analyses concurrently
+        def analyze_batch(args):
+            idx, prompt = args
+            return idx, llm_call(prompt)
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(analyze_batch, bp): bp[0] for bp in batch_prompts}
+
+            for future in as_completed(futures):
+                idx, analysis = future.result()
+                if analysis:
+                    following_analyses.append((idx, analysis))
+                    if verbose:
+                        print(f"    ✓ Batch {idx + 1}/{len(batches)} analyzed")
+                elif verbose:
+                    print(f"    ✗ Batch {idx + 1}/{len(batches)} failed")
+
+        # Sort by batch index
+        following_analyses.sort(key=lambda x: x[0])
+        following_analyses = [a[1] for a in following_analyses]
+
+    # Prepare synthesis
+    if verbose:
+        print("  Synthesizing final dossier...")
+
+    enrichment_str = json.dumps(enrichment, indent=2, default=str) if enrichment else "No enrichment data"
+    following_str = "\n\n---\n\n".join(following_analyses) if following_analyses else "No following data analyzed"
+    articles_str = json.dumps(results.articles, indent=2, default=str) if results.articles else "No articles found"
+
+    synthesis_prompt = SYNTHESIS_PROMPT.format(
+        enrichment_data=enrichment_str,
+        following_analyses=following_str,
+        articles_data=articles_str
+    )
+
+    # Generate final dossier
+    dossier = llm_call(synthesis_prompt)
+
+    if dossier and verbose:
+        print("  ✓ Dossier complete!")
+
+    return dossier
+
+
+# Legacy functions for backwards compatibility
+def generate_dossier_gemini(data: Dict) -> Optional[str]:
+    """Legacy: Generate dossier using Google Gemini."""
+    prompt = DOSSIER_PROMPT.format(data=json.dumps(data, indent=2, default=str))
+    return _call_gemini(prompt)
+
+
+def generate_dossier_openai(data: Dict) -> Optional[str]:
+    """Legacy: Generate dossier using OpenAI."""
+    prompt = DOSSIER_PROMPT.format(data=json.dumps(data, indent=2, default=str))
+    return _call_openai(prompt)
+
+
+def generate_dossier_anthropic(data: Dict) -> Optional[str]:
+    """Legacy: Generate dossier using Anthropic Claude."""
+    prompt = DOSSIER_PROMPT.format(data=json.dumps(data, indent=2, default=str))
+    return _call_anthropic(prompt)
+
+
+def _legacy_generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool = True) -> Optional[str]:
+    """Legacy single-call dossier generation (not recommended)."""
     data = {}
     if results.enrichment:
         data["enrichment"] = results.enrichment
-    if results.following:
-        data["following"] = results.following
+    if results.following_twitter:
+        data["following_twitter"] = results.following_twitter
+    if results.following_instagram:
+        data["following_instagram"] = results.following_instagram
     if results.articles:
         data["articles"] = results.articles
 
@@ -621,7 +973,8 @@ Get your Nyne.ai API keys at: https://nyne.ai
     )
     parser.add_argument("--email", help="Person's email address")
     parser.add_argument("--linkedin", help="LinkedIn profile URL")
-    parser.add_argument("--twitter", help="Twitter/X profile URL")
+    parser.add_argument("--twitter", help="Twitter/X profile URL (for psychographics)")
+    parser.add_argument("--instagram", help="Instagram profile URL (for psychographics)")
     parser.add_argument("--name", help="Person's full name (auto-extracted from enrichment)")
     parser.add_argument("--company", help="Person's company (auto-extracted from enrichment)")
     parser.add_argument("--output", "-o", help="Output file path")
@@ -639,6 +992,7 @@ Get your Nyne.ai API keys at: https://nyne.ai
         email=args.email,
         linkedin_url=args.linkedin,
         twitter_url=args.twitter,
+        instagram_url=args.instagram,
         name=args.name,
         company=args.company
     )
@@ -648,7 +1002,8 @@ Get your Nyne.ai API keys at: https://nyne.ai
     if args.json:
         output = json.dumps({
             "enrichment": results.enrichment,
-            "following": results.following,
+            "following_twitter": results.following_twitter,
+            "following_instagram": results.following_instagram,
             "articles": results.articles
         }, indent=2, default=str)
     else:
@@ -673,6 +1028,7 @@ def research_person(
     email: str = None,
     linkedin_url: str = None,
     twitter_url: str = None,
+    instagram_url: str = None,
     name: str = None,
     company: str = None,
     generate_dossier_flag: bool = True,
@@ -691,6 +1047,7 @@ def research_person(
         email=email,
         linkedin_url=linkedin_url,
         twitter_url=twitter_url,
+        instagram_url=instagram_url,
         name=name,
         company=company
     )
@@ -700,7 +1057,8 @@ def research_person(
     output = {
         "data": {
             "enrichment": results.enrichment,
-            "following": results.following,
+            "following_twitter": results.following_twitter,
+            "following_instagram": results.following_instagram,
             "articles": results.articles
         }
     }
