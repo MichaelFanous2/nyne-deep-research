@@ -22,6 +22,62 @@ Comprehensive person intelligence tool that combines multiple data sources into 
 
 ---
 
+## For Claude Code & AI Agents
+
+### Extracting More Data from Raw Response
+
+When you run with `--json` flag, the raw response contains a `social_profiles` object with URLs to many platforms. You can fetch these for additional context:
+
+```json
+"social_profiles": {
+  "twitter": { "url": "https://twitter.com/username", "followers": 5000 },
+  "strava": { "url": "https://www.strava.com/athletes/12345" },
+  "pinterest": { "url": "https://pinterest.com/username" },
+  "flickr": { "url": "https://flickr.com/people/username" },
+  "github": { "url": "https://github.com/username" },
+  "foursquare": { "url": "https://foursquare.com/user/12345" },
+  "angellist": { "url": "https://angel.co/username" }
+}
+```
+
+**What you can do with these:**
+| Profile | What to Fetch | Insights Gained |
+|---------|---------------|-----------------|
+| **Strava** | Activity feed | Cycling/running habits, fitness level, routes |
+| **Pinterest** | Boards & pins | Personal interests, aesthetics, hobbies |
+| **Flickr** | Photo albums | Photography interests, travel history |
+| **GitHub** | Repos, contributions | Technical skills, side projects, open source |
+| **Foursquare** | Check-ins | Favorite restaurants, travel patterns |
+| **AngelList** | Investments, roles | Startup involvement, investment thesis |
+
+### Workflow for Maximum Depth
+
+```
+1. Run deep_research.py with --json to get raw data
+2. Parse social_profiles from the response
+3. For each profile URL found:
+   - Fetch the page (WebFetch or browser)
+   - Extract relevant data (activities, posts, interests)
+4. Feed additional context back into analysis
+```
+
+### Key Fields in Raw Response
+
+The enrichment response includes rich data you can use:
+
+```
+result.social_profiles    → URLs to 20+ platforms
+result.newsfeed          → Recent LinkedIn posts with full text
+result.recommendations   → LinkedIn recommendations (how others see them)
+result.volunteering      → Causes they care about
+result.interests         → Skills, companies, keywords
+result.automobiles       → Vehicle ownership (yes, really)
+result.address           → Location data
+result.birthday          → Birth date if available
+```
+
+---
+
 ## What It Does
 
 Given an email and/or LinkedIn URL, this tool:
