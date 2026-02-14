@@ -1219,7 +1219,7 @@ def _call_gemini(prompt: str) -> Optional[str]:
         import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel(
-            'gemini-3-flash-preview',
+            'gemini-2.5-flash',
             generation_config={"temperature": 0.7, "max_output_tokens": 65536}
         )
         response = model.generate_content(prompt)
@@ -1341,7 +1341,10 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
 
     if batches:
         if verbose:
-            print(f"  Analyzing {len(all_following)} followed accounts in {len(batches)} batches...")
+            print(f"\n  ── PHASE 1: Batch Analysis ──")
+            print(f"  Analyzing {len(all_following)} followed accounts in {len(batches)} batches (batch size: {batch_size})")
+            pending_batches = set(range(len(batches)))
+            print(f"  Pending: {', '.join(f'B{i+1}' for i in sorted(pending_batches))}")
 
         # Prepare batch prompts
         batch_prompts = []
@@ -1359,21 +1362,33 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
             batch_prompts.append((i, prompt))
 
         # Run batch analyses concurrently
+        phase1_start = time.time()
+
         def analyze_batch(args):
             idx, prompt = args
             return idx, llm_call(prompt)
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(analyze_batch, bp): bp[0] for bp in batch_prompts}
+            completed_count = 0
 
             for future in as_completed(futures):
                 idx, analysis = future.result()
+                elapsed = time.time() - phase1_start
                 if analysis:
                     following_analyses.append((idx, analysis))
+                    completed_count += 1
                     if verbose:
-                        print(f"    ✓ Batch {idx + 1}/{len(batches)} analyzed")
+                        pending_batches.discard(idx)
+                        remaining = sorted(pending_batches)
+                        print(f"    ✓ Batch {idx + 1}/{len(batches)} done ({elapsed:.1f}s) | {completed_count}/{len(batches)} complete | Waiting on: {', '.join(f'B{i+1}' for i in remaining) if remaining else 'none'}")
                 elif verbose:
-                    print(f"    ✗ Batch {idx + 1}/{len(batches)} failed")
+                    pending_batches.discard(idx)
+                    remaining = sorted(pending_batches)
+                    print(f"    ✗ Batch {idx + 1}/{len(batches)} FAILED ({elapsed:.1f}s) | Waiting on: {', '.join(f'B{i+1}' for i in remaining) if remaining else 'none'}")
+
+        if verbose:
+            print(f"  Phase 1 finished in {time.time() - phase1_start:.1f}s ({completed_count}/{len(batches)} succeeded)")
 
         # Sort by batch index
         following_analyses.sort(key=lambda x: x[0])
@@ -1394,7 +1409,10 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
 
     if all_following:
         if verbose:
-            print(f"  Running 5 deep cluster analyses in parallel...")
+            cluster_names = ["Sports", "Entertainment", "Causes", "Network", "Hidden"]
+            print(f"\n  ── PHASE 2: Deep Cluster Analysis ──")
+            print(f"  Running 5 clusters in parallel: {', '.join(cluster_names)}")
+            pending_clusters = set(cluster_analyses.keys())
 
         # Prepare all following data as a string for cluster prompts
         all_following_str = json.dumps(all_following, indent=2, default=str)
@@ -1434,6 +1452,8 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
         }
 
         # Run cluster analyses concurrently
+        phase2_start = time.time()
+
         def run_cluster(args):
             cluster_name, prompt = args
             return cluster_name, llm_call(prompt)
@@ -1441,15 +1461,25 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(run_cluster, (name, prompt)): name
                       for name, prompt in cluster_prompts.items()}
+            cluster_done = 0
 
             for future in as_completed(futures):
                 cluster_name, analysis = future.result()
+                elapsed = time.time() - phase2_start
                 if analysis:
                     cluster_analyses[cluster_name] = analysis
+                    cluster_done += 1
                     if verbose:
-                        print(f"    ✓ {cluster_name.capitalize()} cluster analyzed")
+                        pending_clusters.discard(cluster_name)
+                        remaining = sorted(pending_clusters)
+                        print(f"    ✓ {cluster_name.capitalize()} done ({elapsed:.1f}s) | {cluster_done}/5 complete | Waiting on: {', '.join(c.capitalize() for c in remaining) if remaining else 'none'}")
                 elif verbose:
-                    print(f"    ✗ {cluster_name.capitalize()} cluster failed")
+                    pending_clusters.discard(cluster_name)
+                    remaining = sorted(pending_clusters)
+                    print(f"    ✗ {cluster_name.capitalize()} FAILED ({elapsed:.1f}s) | Waiting on: {', '.join(c.capitalize() for c in remaining) if remaining else 'none'}")
+
+        if verbose:
+            print(f"  Phase 2 finished in {time.time() - phase2_start:.1f}s ({cluster_done}/5 succeeded)")
 
     # =========================================================================
     # PHASE 3: Final Synthesis
@@ -1457,7 +1487,9 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
     # =========================================================================
 
     if verbose:
+        print(f"\n  ── PHASE 3: Final Synthesis ──")
         print("  Synthesizing final dossier...")
+        synthesis_start = time.time()
 
     enrichment_str = json.dumps(enrichment, indent=2, default=str) if enrichment else "No enrichment data"
     following_str = "\n\n---\n\n".join(following_analyses) if following_analyses else "No following data analyzed"
@@ -1478,7 +1510,7 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
     dossier = llm_call(synthesis_prompt)
 
     if dossier and verbose:
-        print("  ✓ Dossier complete!")
+        print(f"  ✓ Dossier complete! ({time.time() - synthesis_start:.1f}s)")
 
     return dossier
 
