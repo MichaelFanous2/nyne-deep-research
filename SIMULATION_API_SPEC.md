@@ -69,8 +69,8 @@ POST /v1/simulate
 {
     "data": {
         "enrichment": { ... },         # Raw Nyne.ai enrichment response
-        "following_twitter": { ... },  # Raw Twitter following data
-        "following_instagram": { ... }, # Raw Instagram following data
+        "following_twitter": { ... },  # Raw Twitter engagement data
+        "following_instagram": { ... }, # Raw Instagram engagement data
         "articles": { ... }            # Raw article search results
     },
     "simulation": "## 1. AT A GLANCE\n\n**Question:** ..."   # Markdown string — the full simulation output
