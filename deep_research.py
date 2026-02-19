@@ -1634,7 +1634,7 @@ def _call_gemini(prompt: str) -> Optional[str]:
         import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel(
-            'gemini-3-flash-preview',
+            'gemini-2.5-flash',
             generation_config={"temperature": 0.7, "max_output_tokens": 65536}
         )
         response = model.generate_content(prompt)
@@ -1948,9 +1948,11 @@ For each flagged account, explain WHY it's relevant to the question.'''
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(analyze_batch, bp): bp[0] for bp in batch_prompts}
+            completed_count = 0
 
             for future in as_completed(futures):
                 idx, analysis = future.result()
+                elapsed = time.time() - phase1_start
                 if analysis:
                     following_analyses.append((idx, analysis))
                     _log(f"  ✓ Batch {idx + 1}/{len(batches)} done ({_batch_times.get(idx, 0):.1f}s)")
@@ -2069,9 +2071,11 @@ Pay extra attention to any signals that would help predict their stance on this 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(run_cluster, (name, prompt)): name
                       for name, prompt in cluster_prompts.items()}
+            cluster_done = 0
 
             for future in as_completed(futures):
                 cluster_name, analysis = future.result()
+                elapsed = time.time() - phase2_start
                 if analysis:
                     cluster_analyses[cluster_name] = analysis
                     _log(f"  ✓ {cluster_name.capitalize()} cluster done ({_cluster_times.get(cluster_name, 0):.1f}s)")
