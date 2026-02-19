@@ -38,7 +38,8 @@ import warnings
 import requests
 
 # Suppress deprecation warning from google.generativeai
-warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
@@ -61,6 +62,107 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 NYNE_BASE_URL = "https://api.nyne.ai"
+
+# Following cache file path (pre-fetched data)
+FOLLOWING_CACHE_FILE = "/Users/michaelfanous/deep_research_test/nyne-deep-research/following_cache.json"
+
+# Global cache (loaded once)
+_following_cache = None
+
+
+def load_following_cache() -> Dict:
+    """Load the following cache file. Returns empty dict if not found."""
+    global _following_cache
+    if _following_cache is not None:
+        return _following_cache
+
+    if os.path.exists(FOLLOWING_CACHE_FILE):
+        try:
+            with open(FOLLOWING_CACHE_FILE) as f:
+                _following_cache = json.load(f)
+                return _following_cache
+        except Exception:
+            pass
+
+    _following_cache = {}
+    return _following_cache
+
+
+def normalize_linkedin_username(url: str) -> str:
+    """Extract LinkedIn username from URL."""
+    if not url:
+        return ""
+    import re
+    url = url.lower().strip().split("?")[0].rstrip("/")
+    match = re.search(r'linkedin\.com/in/([^/]+)', url)
+    return match.group(1) if match else ""
+
+
+def lookup_following_from_cache(email: str = None, linkedin_url: str = None,
+                                 twitter_url: str = None, instagram_url: str = None) -> Dict:
+    """
+    Look up following data from pre-fetched cache.
+    Returns dict with 'twitter' and 'instagram' keys, each containing cached data or None.
+    """
+    cache = load_following_cache()
+    if not cache:
+        return {"twitter": None, "instagram": None}
+
+    result = {"twitter": None, "instagram": None}
+
+    # Try to find by email first
+    if email:
+        email_key = email.lower().strip()
+        entry = cache.get("by_email", {}).get(email_key)
+        if entry:
+            # Found by email - now get Twitter/Instagram data
+            cached_twitter_url = entry.get("twitter_url", "").lower() if entry.get("twitter_url") else ""
+            cached_instagram_url = entry.get("instagram_url", "").lower() if entry.get("instagram_url") else ""
+
+            if cached_twitter_url:
+                twitter_entry = cache.get("by_twitter", {}).get(cached_twitter_url)
+                if twitter_entry and twitter_entry.get("following"):
+                    result["twitter"] = twitter_entry["following"]
+
+            if cached_instagram_url:
+                instagram_entry = cache.get("by_instagram", {}).get(cached_instagram_url)
+                if instagram_entry and instagram_entry.get("following"):
+                    result["instagram"] = instagram_entry["following"]
+
+    # Try LinkedIn if email didn't find everything
+    if linkedin_url and (result["twitter"] is None or result["instagram"] is None):
+        linkedin_username = normalize_linkedin_username(linkedin_url)
+        if linkedin_username:
+            entry = cache.get("by_linkedin", {}).get(linkedin_username)
+            if entry:
+                cached_twitter_url = entry.get("twitter_url", "").lower() if entry.get("twitter_url") else ""
+                cached_instagram_url = entry.get("instagram_url", "").lower() if entry.get("instagram_url") else ""
+
+                if result["twitter"] is None and cached_twitter_url:
+                    twitter_entry = cache.get("by_twitter", {}).get(cached_twitter_url)
+                    if twitter_entry and twitter_entry.get("following"):
+                        result["twitter"] = twitter_entry["following"]
+
+                if result["instagram"] is None and cached_instagram_url:
+                    instagram_entry = cache.get("by_instagram", {}).get(cached_instagram_url)
+                    if instagram_entry and instagram_entry.get("following"):
+                        result["instagram"] = instagram_entry["following"]
+
+    # Direct lookup by Twitter URL if provided
+    if result["twitter"] is None and twitter_url:
+        twitter_key = twitter_url.lower().strip()
+        twitter_entry = cache.get("by_twitter", {}).get(twitter_key)
+        if twitter_entry and twitter_entry.get("following"):
+            result["twitter"] = twitter_entry["following"]
+
+    # Direct lookup by Instagram URL if provided
+    if result["instagram"] is None and instagram_url:
+        instagram_key = instagram_url.lower().strip()
+        instagram_entry = cache.get("by_instagram", {}).get(instagram_key)
+        if instagram_entry and instagram_entry.get("following"):
+            result["instagram"] = instagram_entry["following"]
+
+    return result
 
 
 def check_setup():
@@ -147,6 +249,16 @@ class ResearchResults:
     following_instagram: Optional[Dict] = None
     articles: Optional[Dict] = None
     errors: Optional[Dict] = None
+
+
+@dataclass
+class QuestionContext:
+    """Context derived from analyzing a simulation question."""
+    question: str
+    cluster_priorities: Dict[str, str]  # cluster_name -> "critical"/"useful"/"skip"
+    specific_signals: list  # what to look for in following data
+    additional_focus: str  # extra instructions to inject into cluster prompts
+    enrichment_focus: list  # which enrichment fields matter most
 
 
 # ============================================================================
@@ -282,9 +394,27 @@ def deep_research(input_data: ResearchInput, verbose: bool = True) -> ResearchRe
     """
     Execute deep research on a person using all available Nyne.ai endpoints.
     Gracefully handles missing data - never throws errors.
+    Uses pre-fetched cache when available to skip live API calls.
     """
     results = ResearchResults(errors={})
     request_ids = {}
+
+    # Check cache for pre-fetched following data
+    cached_following = lookup_following_from_cache(
+        email=input_data.email,
+        linkedin_url=input_data.linkedin_url,
+        twitter_url=input_data.twitter_url,
+        instagram_url=input_data.instagram_url
+    )
+    cache_twitter_hit = cached_following.get("twitter") is not None
+    cache_instagram_hit = cached_following.get("instagram") is not None
+
+
+    # Apply cached data immediately
+    if cache_twitter_hit:
+        results.following_twitter = cached_following["twitter"]
+    if cache_instagram_hit:
+        results.following_instagram = cached_following["instagram"]
 
     # Check for API credentials
     headers = get_headers()
@@ -316,18 +446,20 @@ def deep_research(input_data: ResearchInput, verbose: bool = True) -> ResearchRe
         print("  - Enrichment: skipped (no valid input)")
 
     # Twitter and/or Instagram following (for psychographics)
-    if input_data.twitter_url:
+    # Skip if already have cached data
+    if input_data.twitter_url and not results.following_twitter:
         req_id = submit_following(input_data.twitter_url, headers)
         if req_id:
             request_ids["following_twitter"] = req_id
             if verbose:
-                print("  ✓ Twitter following request submitted")
-    if input_data.instagram_url:
+                print("  ✓ Social following request submitted")
+
+    if input_data.instagram_url and not results.following_instagram:
         req_id = submit_following(input_data.instagram_url, headers)
         if req_id:
             request_ids["following_instagram"] = req_id
             if verbose:
-                print("  ✓ Instagram following request submitted")
+                print("  ✓ Social following request submitted")
 
     # Article search
     if input_data.name and input_data.company:
@@ -420,16 +552,22 @@ def deep_research(input_data: ResearchInput, verbose: bool = True) -> ResearchRe
 
             if twitter_url:
                 if verbose:
-                    print(f"  → Found Twitter: {twitter_url}")
-                    print("  → Fetching following list...")
+                    print(f"  → Found social profile")
 
-                req_id = submit_following(twitter_url, headers)
-                if req_id:
-                    result = poll_result("/person/interactions", req_id, headers)
-                    if result:
-                        results.following_twitter = result
-                        if verbose:
-                            print("  ✓ Following (Twitter): completed")
+                # Check cache first with the discovered Twitter URL
+                cache_check = lookup_following_from_cache(twitter_url=twitter_url)
+                if cache_check.get("twitter"):
+                    results.following_twitter = cache_check["twitter"]
+                else:
+                    if verbose:
+                        print("  → Fetching following list...")
+                    req_id = submit_following(twitter_url, headers)
+                    if req_id:
+                        result = poll_result("/person/interactions", req_id, headers)
+                        if result:
+                            results.following_twitter = result
+                            if verbose:
+                                print("  ✓ Following list: completed")
 
         # Try Instagram if not already fetched
         if "following_instagram" not in request_ids and not results.following_instagram:
@@ -438,16 +576,22 @@ def deep_research(input_data: ResearchInput, verbose: bool = True) -> ResearchRe
 
             if instagram_url:
                 if verbose:
-                    print(f"  → Found Instagram: {instagram_url}")
-                    print("  → Fetching following list...")
+                    print(f"  → Found social profile")
 
-                req_id = submit_following(instagram_url, headers)
-                if req_id:
-                    result = poll_result("/person/interactions", req_id, headers)
-                    if result:
-                        results.following_instagram = result
-                        if verbose:
-                            print("  ✓ Following (Instagram): completed")
+                # Check cache first with the discovered Instagram URL
+                cache_check = lookup_following_from_cache(instagram_url=instagram_url)
+                if cache_check.get("instagram"):
+                    results.following_instagram = cache_check["instagram"]
+                else:
+                    if verbose:
+                        print("  → Fetching following list...")
+                    req_id = submit_following(instagram_url, headers)
+                    if req_id:
+                        result = poll_result("/person/interactions", req_id, headers)
+                        if result:
+                            results.following_instagram = result
+                            if verbose:
+                                print("  ✓ Following list: completed")
 
     if verbose:
         print("\n[3/3] Research complete!")
@@ -486,14 +630,13 @@ Their "superpower" - what makes them uniquely valuable
 Analyze their Twitter/Instagram following to understand WHO they are:
 - Core archetypes (Builder, Investor, Operator, Intellectual, etc.)
 - Values and motivations (inferred from follows)
-- Political/social leanings (if detectable)
+- Professional tribe and community affiliations
 - CLUSTER ANALYSIS: Group the accounts they follow into categories with specific handles:
   - VCs & Investors: @handle1, @handle2...
   - Founders & Operators: ...
   - AI/Tech Researchers: ...
   - Media & Journalists: ...
   - Sports/Entertainment: ...
-  - Politics/Policy: ...
   - Personal/Friends: ...
 
 ## 4. HIDDEN INTERESTS & HOBBIES
@@ -527,20 +670,14 @@ Highly specific hooks based on:
 - Recent news about their company
 Each starter should feel like you KNOW them.
 
-## 8. WARNINGS & LANDMINES
-- Topics that might offend them
-- Competitors or people they might dislike
-- Sensitive career history
-- Political hot buttons to avoid
-
-## 9. "CREEPY GOOD" INSIGHTS
+## 8. "CREEPY GOOD" INSIGHTS
 The insights that make them think "how did they know that?":
 - Patterns in who they follow
 - Connections between their posts and follows
 - Personal details buried in the data
 - Things most people would miss
 
-## 10. SUMMARY: How to Connect With This Person
+## 9. SUMMARY: How to Connect With This Person
 A brief synthesis: what they care about, how they think, and the best angle to approach them.
 
 ---
@@ -549,6 +686,55 @@ HERE IS ALL THE RAW DATA TO ANALYZE:
 {data}
 
 Now write the most thorough dossier possible. Be exhaustive. Go deep.'''
+
+
+# ============================================================================
+# QUESTION ANALYZER PROMPT (Phase 0 for simulation mode)
+# ============================================================================
+
+QUESTION_ANALYZER_PROMPT = '''You are analyzing a question that someone wants to simulate asking a specific person.
+Your job is to determine what data and analysis clusters are most relevant to predicting how this person would respond.
+
+QUESTION: {question}
+
+Respond in EXACTLY this JSON format (no markdown, no code fences, just raw JSON):
+{{
+    "cluster_priorities": {{
+        "sports_fitness": "critical" or "useful" or "skip",
+        "entertainment_culture": "critical" or "useful" or "skip",
+        "causes_values": "critical" or "useful" or "skip",
+        "personal_network": "critical" or "useful" or "skip",
+        "hidden_interests": "critical" or "useful" or "skip"
+    }},
+    "specific_signals": [
+        "list of specific types of accounts/follows to look for",
+        "e.g. political commentators, programming language accounts, remote work advocates"
+    ],
+    "additional_focus": "A paragraph of additional analysis instructions to inject into the critical cluster prompts. Be specific about what sub-topics, opinions, or signals to extract that would help answer this question.",
+    "enrichment_focus": [
+        "list of enrichment fields that matter most",
+        "e.g. posts, career_history, volunteering, articles, social_profiles"
+    ]
+}}
+
+EXAMPLES:
+
+Question: "What does this person think about Trump?"
+→ causes_values: critical, hidden_interests: useful, entertainment_culture: skip, sports_fitness: skip
+→ specific_signals: ["political commentators", "news outlets", "political figures", "partisan media", "political satire accounts"]
+→ additional_focus: "Look for political orientation signals: which news outlets do they follow (Fox News vs MSNBC vs AP)? Do they follow any political figures, PACs, or advocacy organizations? Look for signals of libertarian, progressive, conservative, or centrist leanings. Check for political satire accounts which reveal orientation."
+
+Question: "What does this person think about Rust vs Python?"
+→ causes_values: skip, hidden_interests: useful, entertainment_culture: skip, sports_fitness: skip
+→ specific_signals: ["programming language accounts", "developer tools", "tech thought leaders", "open source projects", "software engineering blogs"]
+→ additional_focus: "Focus on technology preferences: which programming languages, frameworks, and developer tools appear in their follows? Do they follow Rust evangelists or Python data science accounts? Look for signals of systems programming vs scripting preferences, strong typing vs dynamic typing philosophy."
+
+Question: "How would this person react to a cold outreach about our AI startup?"
+→ causes_values: useful, hidden_interests: useful, entertainment_culture: skip, sports_fitness: skip
+→ specific_signals: ["AI companies", "startup founders", "VC accounts", "sales/marketing accounts", "cold email tools"]
+→ additional_focus: "Analyze their relationship to AI and startups: are they an AI optimist or skeptic? Do they follow AI companies or thought leaders? Have they posted about being pitched? Look for signals about how they feel about cold outreach, sales emails, and unsolicited pitches."
+
+Now analyze the given question and return the JSON.'''
 
 
 # ============================================================================
@@ -563,6 +749,8 @@ Role: {person_role}
 Company: {person_company}
 
 ANALYZE THESE {batch_size} ACCOUNTS THEY FOLLOW (Batch {batch_num} of {total_batches}):
+Format: @handle | Name | Followers | Bio
+
 {batch_data}
 
 For EACH account, categorize and analyze:
@@ -571,7 +759,7 @@ For EACH account, categorize and analyze:
    - Personal Interest: Sports (which sport?), Fitness, Food/Restaurants, Travel, Fashion, Art, Music
    - Entertainment: Comedy, Celebrities, TV Shows, Movies, Gaming
    - Hobbies: Photography, Cooking, Golf, Running, Cycling, Hiking, Cars
-   - Causes: Social Justice, Climate, Politics (what leaning?), Charity
+   - Causes: Philanthropy, Climate, Health, Education, Charity
    - Personal Connection: Family member? College friend? Former colleague?
 
 2. **What this reveals about them personally** - Go beyond the obvious:
@@ -751,70 +939,71 @@ Comprehensive summary of their entertainment tastes:
 - Cultural sophistication level
 - Entertainment conversation starters with specific references'''
 
-CAUSES_POLITICS_CLUSTER_PROMPT = '''You are analyzing someone's following list to understand their VALUES, CAUSES, and POLITICAL LEANINGS.
+CAUSES_VALUES_CLUSTER_PROMPT = '''You are analyzing someone's following list to understand their VALUES, CAUSES, and PHILANTHROPIC INTERESTS.
 
 PERSON: {person_name} ({person_role} at {person_company})
 
 HERE IS EVERYONE THEY FOLLOW:
 {all_following}
 
-YOUR TASK: Carefully analyze their follows to understand their values and political stance.
+YOUR TASK: Analyze their follows to understand what causes and values matter to them. Focus on philanthropy, community, and personal values - NOT political analysis.
 
-## POLITICAL FIGURES
-List ALL politicians, political commentators, political organizations:
-
-**Democrats/Liberal accounts:** [list all]
-**Republicans/Conservative accounts:** [list all]
-**Independent/Centrist accounts:** [list all]
-**Political media they follow:** [list all]
-
-**Political Lean Assessment:** Based on the PATTERN of follows, what is their likely political orientation?
-(Be specific - not just "liberal" but "progressive Democrat" or "moderate liberal" etc.)
-
-## SOCIAL CAUSES
-### Racial Justice / Civil Rights
-**Accounts Found:** [list all]
-**Level of Engagement:** Casual supporter or active advocate?
-
-### Climate / Environment
-**Accounts Found:** [list all]
-
-### LGBTQ+ Rights
-**Accounts Found:** [list all]
-
-### Women's Rights / Feminism
-**Accounts Found:** [list all]
-
-### Immigration
-**Accounts Found:** [list all]
-
-### Economic Justice / Labor
-**Accounts Found:** [list all]
-
-### Other Causes
-**Accounts Found:** [list all]
-
-## NONPROFIT / CHARITY
-- Charitable organizations
+## PHILANTHROPY & CHARITY
+- Charitable organizations they follow
+- Nonprofit leaders
+- Philanthropic foundations
 - Volunteering organizations
-- Philanthropic accounts
 
 **Accounts Found:** [list all]
-**Causes They Support:** What do they care about?
+**Causes They Support:** What charitable causes do they care about?
 
-## RELIGIOUS / SPIRITUAL
-- Religious leaders, organizations
-- Spiritual accounts
-- Meditation, mindfulness
+## EDUCATION & YOUTH
+- Schools, universities they follow
+- Education nonprofits
+- Youth mentorship programs
+- Scholarship organizations
 
 **Accounts Found:** [list all]
-**Spiritual Profile:** Religious? Spiritual but not religious? Secular?
+**Education Focus:** Do they support education causes?
+
+## HEALTH & WELLNESS CAUSES
+- Health charities
+- Mental health advocates
+- Medical research organizations
+- Wellness communities
+
+**Accounts Found:** [list all]
+
+## ENVIRONMENT & SUSTAINABILITY
+- Environmental organizations
+- Climate tech companies
+- Sustainability advocates
+- Conservation groups
+
+**Accounts Found:** [list all]
+
+## ENTREPRENEURSHIP & INNOVATION
+- Startup ecosystem accounts
+- Incubators, accelerators
+- Entrepreneurship education
+- Innovation communities
+
+**Accounts Found:** [list all]
+
+## SPIRITUAL / MINDFULNESS
+- Meditation, mindfulness accounts
+- Spiritual leaders
+- Wellness retreats
+- Philosophy accounts
+
+**Accounts Found:** [list all]
+**Mindfulness Profile:** Do they follow wellness/mindfulness content?
 
 ## LOCAL COMMUNITY
-- Local politicians
-- Local news
+- Local news outlets
 - Community organizations
 - Local businesses, events
+- City/neighborhood accounts
 
 **Accounts Found:** [list all]
 **Community Engagement:** How connected are they to their local community?
@@ -822,9 +1011,9 @@ List ALL politicians, political commentators, political organizations:
 ## VALUES SUMMARY
 Based on all the above:
 - Core values they hold
-- Issues they likely care deeply about
-- Political conversation landmines to avoid
-- Safe ways to connect on shared values'''
+- Causes they likely care deeply about
+- Community involvement level
+- Good conversation topics around shared values'''
 
 PERSONAL_NETWORK_CLUSTER_PROMPT = '''You are analyzing someone's following list to map their PERSONAL NETWORK and RELATIONSHIPS.
 
@@ -977,6 +1166,19 @@ You have access to:
 
 YOUR TASK: Create the most comprehensive dossier that would help someone truly KNOW this person - their passions, quirks, what makes them laugh, what they care about, who they spend time with.
 
+CRITICAL RULE - ATTRIBUTION REQUIRED:
+Every single claim or insight MUST be attributed to a specific anchor:
+- An account they follow (e.g., "Follows @staborunn and @NYCMarathon, suggesting interest in running")
+- A social media post they made (e.g., "Posted about hosting a Catan tournament on 12/03/2025")
+- Their work history (e.g., "Spent 3 years at Morgan Stanley in payments research")
+- Their bio or self-description (e.g., "Describes themselves as 'lover of life's quirks'")
+- A social profile URL found (e.g., "Has a Strava account, indicating cycling/running activity")
+- An article or press mention (e.g., "Featured in TechCrunch discussing fintech trends")
+
+DO NOT make claims without citing the evidence. If you cannot point to a specific anchor, do not include the claim.
+Example of GOOD: "Follows @VCBrags and @vcstarterkit - enjoys industry satire"
+Example of BAD: "Probably likes hiking" (no evidence cited)
+
 ## ENRICHMENT DATA (Profile, Career, Social Profiles, Posts):
 {enrichment_data}
 
@@ -1065,7 +1267,6 @@ Based on the following analyses, explain WHO this person is:
 - Core identity/archetypes (The Builder? The Mentor? The Explorer?)
 - Values and beliefs (with specific evidence)
 - Aspirations (who do they want to be?)
-- Political/social leanings (with evidence from follows)
 - Professional tribes they belong to
 
 ## 5. SOCIAL GRAPH ANALYSIS (BRIEF OVERVIEW)
@@ -1113,11 +1314,11 @@ Break down by sport:
 - **Fashion**: Brands, designers, fashion media
 - **Home/Design**: Interior design, architecture
 
-### CAUSES & POLITICS
-- **Political Figures**: Which politicians do they follow? What does the pattern suggest?
-- **Social Causes**: Nonprofits, activists, social justice organizations
-- **Climate/Environment**: Environmental accounts
-- **Local Issues**: Local news, local politicians, community accounts
+### CAUSES & VALUES
+- **Philanthropy**: Charitable organizations, nonprofits they support
+- **Community**: Local organizations, community involvement
+- **Climate/Environment**: Environmental accounts, sustainability
+- **Education**: Schools, education nonprofits, mentorship
 
 ### INTELLECTUAL INTERESTS
 - **Books/Reading**: Authors, book clubs, literary accounts
@@ -1175,20 +1376,14 @@ From LinkedIn recommendations:
 - What qualities do people highlight?
 - Any patterns in the praise?
 
-## 11. WARNINGS & LANDMINES
-- Sensitive topics to avoid
-- Career sore spots (failures, missed opportunities)
-- Political hot buttons
-- Personal boundaries
-
-## 12. "CREEPY GOOD" INSIGHTS
+## 11. "CREEPY GOOD" INSIGHTS
 The insights that make them think "how did they know that?":
 - Non-obvious patterns (e.g., follows earthquake bot = interested in SF local news)
 - Cross-referenced discoveries
 - Personal details most wouldn't find
 - Behavioral predictions
 
-## 13. APPROACH STRATEGY
+## 12. APPROACH STRATEGY
 How to connect with this person:
 - Best angle (professional vs personal)
 - Shared connections to mention
@@ -1205,6 +1400,130 @@ CRITICAL INSTRUCTIONS:
 - Conversation Starters MUST include 30+ hooks divided into categories.
 - Be EXHAUSTIVE. This should be 400+ lines of detailed analysis.
 - Do NOT summarize or condense. Include all details from the cluster analyses.'''
+
+
+# ============================================================================
+# SIMULATION SYNTHESIS PROMPT (used when --question is provided)
+# ============================================================================
+
+SIMULATION_SYNTHESIS_PROMPT = '''You are simulating how a real person would respond to a specific question, based on comprehensive intelligence about them.
+
+THE QUESTION BEING ASKED:
+"{question}"
+
+QUESTION ANALYSIS CONTEXT:
+{question_context}
+
+You have access to:
+1. Their full profile/enrichment data (including social profiles)
+2. Detailed analyses of accounts they follow (analyzed with focus on this question)
+3. Deep cluster analyses (specialized for this question's topic)
+4. Articles and press mentions
+5. Personal details (location, career, family connections)
+
+CRITICAL RULE - ATTRIBUTION REQUIRED:
+Every claim about their likely position MUST be attributed to specific evidence:
+- An account they follow (e.g., "Follows @elonmusk and @TechCrunch, suggesting...")
+- A social media post they made (e.g., "Posted about X on 12/03/2025")
+- Their work history (e.g., "Spent 5 years at Google, so likely values...")
+- Their bio or self-description
+- An article or press mention
+- Their social graph patterns
+
+DO NOT speculate without evidence. If evidence is weak, say so explicitly.
+
+## ENRICHMENT DATA (Profile, Career, Social Profiles, Posts):
+{enrichment_data}
+
+## FOLLOWING BATCH ANALYSES (focused on question-relevant signals):
+{following_analyses}
+
+## CLUSTER ANALYSES (question-relevant clusters):
+{cluster_analyses_combined}
+
+## ARTICLES & PRESS:
+{articles_data}
+
+---
+
+Write a THOROUGH simulation report with these sections:
+
+## 1. EVIDENCE SUMMARY
+Organize ALL relevant data points by signal strength:
+
+**Strong Signals (direct evidence):**
+- Direct posts or statements about this topic
+- Accounts they follow that directly relate to this question
+- Career experience directly relevant to this topic
+- Articles where they've spoken about this
+
+**Moderate Signals (adjacent evidence):**
+- Accounts they follow in adjacent areas
+- Career patterns that suggest a leaning
+- Social graph patterns (who do their follows follow?)
+- Demographic/psychographic indicators
+
+**Weak Signals (inferred):**
+- General personality traits that might influence their view
+- Generational or geographic patterns
+- Absence of expected follows (what they DON'T follow can be revealing)
+
+## 2. PSYCHOGRAPHIC REASONING
+Based on their overall profile, explain the reasoning chain:
+- Their core identity/archetype and how it relates to this question
+- Their values system and how it applies here
+- Their communication style and how they'd frame their answer
+- Any relevant life experiences that shape their perspective
+- Cognitive biases or tendencies suggested by their profile
+
+## 3. SIMULATED RESPONSE
+Write out how this person would ACTUALLY respond if asked this question in a natural conversation. This should:
+- Use their actual communication style and tone (formal? casual? data-driven? emotional?)
+- Reference things they'd naturally reference (their interests, experiences, follows)
+- Include the nuance they'd add — most people don't give black-and-white answers
+- Show what they'd push back on or qualify
+- Include their likely emotional register (passionate? indifferent? cautious?)
+- Be written in FIRST PERSON as if they are speaking
+
+**Format as a realistic conversational response — not bullet points. Write it as dialogue.**
+
+## 4. CONFIDENCE ASSESSMENT
+Rate your overall confidence and break down by claim:
+
+**Overall Confidence:** [High/Medium/Low] — [explanation]
+
+**High Confidence Claims:**
+- [Claim] — [evidence]
+
+**Medium Confidence Claims:**
+- [Claim] — [evidence + reasoning]
+
+**Low Confidence / Speculative:**
+- [Claim] — [why this is speculative]
+
+**What We Don't Know:**
+- Key gaps in the data that would change the simulation
+- What additional information would increase confidence
+
+## 5. CONVERSATION PLAYBOOK
+How to actually have this conversation with them:
+
+**Best way to bring this up:**
+- Natural entry points based on their interests
+- Framing that would resonate with their communication style
+
+**What they'd engage with:**
+- Follow-up questions they'd find interesting
+- Angles that would draw out their real opinion
+
+**Landmines to avoid:**
+- Topics or framings that would shut them down
+- Assumptions that might offend them
+
+**Predicted follow-up questions they'd ask YOU:**
+- Based on their personality and interests, what would they want to know?
+
+This simulation should feel like talking to someone who KNOWS this person well — not a generic AI response.'''
 
 
 # ============================================================================
@@ -1237,7 +1556,7 @@ def _call_openai(prompt: str) -> Optional[str]:
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_API_KEY)
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=16384
@@ -1264,6 +1583,19 @@ def _call_anthropic(prompt: str) -> Optional[str]:
         return None
 
 
+# Global backup LLM setting
+_backup_llm = None
+
+def set_backup_llm(backup: str):
+    """Set the backup LLM to use when primary fails."""
+    global _backup_llm
+    _backup_llm = backup
+
+def get_backup_llm() -> Optional[str]:
+    """Get the current backup LLM setting."""
+    global _backup_llm
+    return _backup_llm
+
 def _get_llm_caller(llm: str = "auto"):
     """Get the appropriate LLM call function."""
     if llm == "gemini" and GEMINI_API_KEY:
@@ -1281,6 +1613,35 @@ def _get_llm_caller(llm: str = "auto"):
             return _call_anthropic, "anthropic"
     return None, None
 
+def _call_llm_with_fallback(prompt: str, primary_llm: str = "auto", backup_llm: str = None) -> Optional[str]:
+    """Call LLM with automatic fallback. Gemini -> OpenAI by default."""
+    # Default fallback chain: gemini -> openai -> anthropic
+    fallback_order = ["gemini", "openai", "anthropic"]
+
+    # Determine primary
+    if primary_llm == "auto":
+        primary_llm = "gemini" if GEMINI_API_KEY else ("openai" if OPENAI_API_KEY else "anthropic")
+
+    # Try primary
+    caller, primary_name = _get_llm_caller(primary_llm)
+    if caller:
+        result = caller(prompt)
+        if result:
+            return result
+
+    # Primary failed - try fallbacks automatically
+    for fallback in fallback_order:
+        if fallback == primary_llm:
+            continue  # Skip primary, already tried
+        backup_caller, backup_name = _get_llm_caller(fallback)
+        if backup_caller:
+            print(f"    ↻ Falling back to {backup_name}...", flush=True)
+            result = backup_caller(prompt)
+            if result:
+                return result
+
+    return None
+
 
 def _batch_following_data(following_data: Dict, batch_size: int = 75) -> list:
     """Split following data into batches."""
@@ -1294,23 +1655,135 @@ def _batch_following_data(following_data: Dict, batch_size: int = 75) -> list:
     return batches
 
 
-def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool = True) -> Optional[str]:
+def _slim_following_for_llm(following_list: list) -> list:
     """
-    Generate intelligent dossier using batched LLM calls for deep analysis.
+    Strip unnecessary fields from following data to reduce token usage.
+    Keeps only: username, display_name, followers_count, bio, location
+    """
+    slim = []
+    for item in following_list:
+        actor = item.get("actor", {})
+        slim.append({
+            "handle": actor.get("username", ""),
+            "name": actor.get("display_name", ""),
+            "followers": actor.get("followers_count", ""),
+            "bio": actor.get("bio", ""),
+            "location": actor.get("location", ""),
+        })
+    return slim
 
-    1. Batch the following lists into chunks
-    2. Run concurrent LLM calls to analyze each batch
-    3. Synthesize all analyses into final dossier
+
+def _following_to_compact_string(following_list: list) -> str:
     """
-    # Get LLM caller
-    llm_call, llm_name = _get_llm_caller(llm)
-    if not llm_call:
-        if verbose:
-            print("  ⚠ No LLM available. Set GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY")
+    Convert following list to compact string format for LLM prompts.
+    Format: @handle | Name | Followers | Bio
+    Much more token-efficient than JSON.
+    """
+    lines = []
+    for item in following_list:
+        actor = item.get("actor", {})
+        handle = actor.get("username", "unknown")
+        name = actor.get("display_name", "")
+        followers = actor.get("followers_count", "?")
+        bio = (actor.get("bio", "") or "").replace("\n", " ").strip()
+        lines.append(f"@{handle} | {name} | {followers} followers | {bio}")
+    return "\n".join(lines)
+
+
+def analyze_question(question: str, llm: str = "auto", verbose: bool = True) -> Optional[QuestionContext]:
+    """
+    Analyze a simulation question to determine which clusters and signals matter most.
+    Returns a QuestionContext that shapes the rest of the pipeline.
+    """
+    backup = get_backup_llm()
+    prompt = QUESTION_ANALYZER_PROMPT.format(question=question)
+    raw = _call_llm_with_fallback(prompt, llm, backup)
+    if not raw:
         return None
 
-    if verbose:
-        print(f"\n[LLM] Using {llm_name} for deep analysis...")
+    # Parse JSON response (strip markdown fences if present)
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+    if raw.endswith("```"):
+        raw = raw[:-3]
+    raw = raw.strip()
+    if raw.startswith("json"):
+        raw = raw[4:].strip()
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        if verbose:
+            print(f"  ⚠ Failed to parse question analysis JSON, using defaults")
+        return QuestionContext(
+            question=question,
+            cluster_priorities={"sports_fitness": "useful", "entertainment_culture": "useful",
+                               "causes_values": "useful", "personal_network": "useful",
+                               "hidden_interests": "useful"},
+            specific_signals=[],
+            additional_focus="",
+            enrichment_focus=["posts", "career_history", "articles"]
+        )
+
+    return QuestionContext(
+        question=question,
+        cluster_priorities=parsed.get("cluster_priorities", {}),
+        specific_signals=parsed.get("specific_signals", []),
+        additional_focus=parsed.get("additional_focus", ""),
+        enrichment_focus=parsed.get("enrichment_focus", [])
+    )
+
+
+def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool = True, question: Optional[str] = None) -> Optional[str]:
+    """
+    Generate intelligent dossier using batched LLM calls for deep analysis.
+    If question is provided, runs in simulation mode with question-adaptive analysis.
+
+    1. (Optional) Analyze the question to determine cluster priorities
+    2. Batch the following lists into chunks
+    3. Run concurrent LLM calls to analyze each batch
+    4. Synthesize all analyses into final dossier (or simulation)
+    """
+    import time as _time
+    _start_total = _time.time()
+
+    def _log(msg, start_time=None):
+        elapsed = ""
+        if start_time:
+            elapsed = f" ({_time.time() - start_time:.1f}s)"
+        if verbose:
+            print(f"  [{_time.strftime('%H:%M:%S')}] {msg}{elapsed}", flush=True)
+
+    # Get LLM caller (with fallback support)
+    primary_call, llm_name = _get_llm_caller(llm)
+    if not primary_call:
+        _log("⚠ No LLM available. Set GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY")
+        return None
+
+    # Wrap with fallback support - capture backup at definition time for thread safety
+    backup = get_backup_llm()
+    def llm_call(prompt: str) -> Optional[str]:
+        return _call_llm_with_fallback(prompt, llm, backup)
+
+    _log(f"Using {llm_name} for deep analysis (fallback: gemini→openai→anthropic)")
+
+    # Phase 0: Analyze question (if in simulation mode)
+    question_ctx = None
+    if question:
+        _log(f"PHASE 0: Analyzing question for simulation mode...")
+        _q_start = _time.time()
+        question_ctx = analyze_question(question, llm=llm, verbose=verbose)
+        if question_ctx:
+            _log(f"PHASE 0 COMPLETE: Question analyzed", _q_start)
+            skipped = [k for k, v in question_ctx.cluster_priorities.items() if v == "skip"]
+            critical = [k for k, v in question_ctx.cluster_priorities.items() if v == "critical"]
+            if skipped:
+                _log(f"  Skipping clusters: {', '.join(skipped)}")
+            if critical:
+                _log(f"  Critical clusters: {', '.join(critical)}")
+        else:
+            _log(f"  ⚠ Question analysis failed, proceeding with all clusters")
 
     # Extract person context from enrichment
     enrichment = results.enrichment or {}
@@ -1340,13 +1813,13 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
     following_analyses = []
 
     if batches:
-        if verbose:
-            print(f"  Analyzing {len(all_following)} followed accounts in {len(batches)} batches...")
+        _log(f"PHASE 1: Analyzing {len(all_following)} followed accounts in {len(batches)} batches...")
+        _batch_start = _time.time()
 
         # Prepare batch prompts
         batch_prompts = []
         for i, batch in enumerate(batches):
-            batch_data = json.dumps(batch, indent=2, default=str)
+            batch_data = _following_to_compact_string(batch)
             prompt = BATCH_ANALYSIS_PROMPT.format(
                 person_name=person_name,
                 person_role=person_role,
@@ -1356,12 +1829,26 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
                 total_batches=len(batches),
                 batch_data=batch_data
             )
+            # Inject question context into batch prompts
+            if question_ctx:
+                signals_str = ", ".join(question_ctx.specific_signals) if question_ctx.specific_signals else "any accounts relevant to the question"
+                prompt += f'''
+
+ADDITIONAL FOCUS FOR THIS ANALYSIS:
+The goal is to understand how this person would respond to: "{question_ctx.question}"
+Pay special attention to: {signals_str}
+Flag any accounts that DIRECTLY relate to this topic — these are the most valuable signals.
+For each flagged account, explain WHY it's relevant to the question.'''
             batch_prompts.append((i, prompt))
 
         # Run batch analyses concurrently
+        _batch_times = {}
         def analyze_batch(args):
             idx, prompt = args
-            return idx, llm_call(prompt)
+            _s = _time.time()
+            result = llm_call(prompt)
+            _batch_times[idx] = _time.time() - _s
+            return idx, result
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(analyze_batch, bp): bp[0] for bp in batch_prompts}
@@ -1370,10 +1857,11 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
                 idx, analysis = future.result()
                 if analysis:
                     following_analyses.append((idx, analysis))
-                    if verbose:
-                        print(f"    ✓ Batch {idx + 1}/{len(batches)} analyzed")
-                elif verbose:
-                    print(f"    ✗ Batch {idx + 1}/{len(batches)} failed")
+                    _log(f"  ✓ Batch {idx + 1}/{len(batches)} done ({_batch_times.get(idx, 0):.1f}s)")
+                else:
+                    _log(f"  ✗ Batch {idx + 1}/{len(batches)} FAILED")
+
+        _log(f"PHASE 1 COMPLETE: {len(following_analyses)}/{len(batches)} batches", _batch_start)
 
         # Sort by batch index
         following_analyses.sort(key=lambda x: x[0])
@@ -1392,15 +1880,45 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
         "hidden": None
     }
 
-    if all_following:
-        if verbose:
-            print(f"  Running 5 deep cluster analyses in parallel...")
+    # Map cluster keys to their priority keys in QuestionContext
+    _cluster_priority_map = {
+        "sports": "sports_fitness",
+        "entertainment": "entertainment_culture",
+        "causes": "causes_values",
+        "network": "personal_network",
+        "hidden": "hidden_interests"
+    }
 
-        # Prepare all following data as a string for cluster prompts
-        all_following_str = json.dumps(all_following, indent=2, default=str)
+    if all_following:
+        # Determine which clusters to run
+        clusters_to_run = list(cluster_analyses.keys())
+        if question_ctx:
+            clusters_to_run = [
+                c for c in clusters_to_run
+                if question_ctx.cluster_priorities.get(_cluster_priority_map[c], "useful") != "skip"
+            ]
+            skipped_clusters = [c for c in cluster_analyses.keys() if c not in clusters_to_run]
+            if skipped_clusters:
+                _log(f"PHASE 2: Skipping {len(skipped_clusters)} irrelevant clusters: {', '.join(skipped_clusters)}")
+
+        _log(f"PHASE 2: Running {len(clusters_to_run)} deep cluster analyses in parallel...")
+        _cluster_start = _time.time()
+
+        # Prepare all following data as compact string for cluster prompts (much fewer tokens)
+        all_following_str = _following_to_compact_string(all_following)
+
+        # Build question-focus suffix for critical clusters
+        _question_suffix = ""
+        if question_ctx and question_ctx.additional_focus:
+            _question_suffix = f'''
+
+ADDITIONAL FOCUS (this analysis is being used to simulate how this person would respond to a specific question):
+Question: "{question_ctx.question}"
+{question_ctx.additional_focus}
+Pay extra attention to any signals that would help predict their stance on this topic.'''
 
         # Prepare cluster prompts
-        cluster_prompts = {
+        all_cluster_prompts = {
             "sports": SPORTS_FITNESS_CLUSTER_PROMPT.format(
                 person_name=person_name,
                 person_role=person_role,
@@ -1413,7 +1931,7 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
                 person_company=person_company,
                 all_following=all_following_str
             ),
-            "causes": CAUSES_POLITICS_CLUSTER_PROMPT.format(
+            "causes": CAUSES_VALUES_CLUSTER_PROMPT.format(
                 person_name=person_name,
                 person_role=person_role,
                 person_company=person_company,
@@ -1433,10 +1951,24 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
             )
         }
 
+        # Inject question focus into critical clusters
+        if question_ctx:
+            for cluster_name in clusters_to_run:
+                priority_key = _cluster_priority_map[cluster_name]
+                if question_ctx.cluster_priorities.get(priority_key) == "critical":
+                    all_cluster_prompts[cluster_name] += _question_suffix
+
+        # Filter to only clusters we're running
+        cluster_prompts = {k: v for k, v in all_cluster_prompts.items() if k in clusters_to_run}
+
         # Run cluster analyses concurrently
+        _cluster_times = {}
         def run_cluster(args):
             cluster_name, prompt = args
-            return cluster_name, llm_call(prompt)
+            _s = _time.time()
+            result = llm_call(prompt)
+            _cluster_times[cluster_name] = _time.time() - _s
+            return cluster_name, result
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(run_cluster, (name, prompt)): name
@@ -1446,39 +1978,78 @@ def generate_dossier(results: ResearchResults, llm: str = "auto", verbose: bool 
                 cluster_name, analysis = future.result()
                 if analysis:
                     cluster_analyses[cluster_name] = analysis
-                    if verbose:
-                        print(f"    ✓ {cluster_name.capitalize()} cluster analyzed")
-                elif verbose:
-                    print(f"    ✗ {cluster_name.capitalize()} cluster failed")
+                    _log(f"  ✓ {cluster_name.capitalize()} cluster done ({_cluster_times.get(cluster_name, 0):.1f}s)")
+                else:
+                    _log(f"  ✗ {cluster_name.capitalize()} cluster FAILED")
+
+        _log(f"PHASE 2 COMPLETE: {sum(1 for v in cluster_analyses.values() if v)}/5 clusters", _cluster_start)
 
     # =========================================================================
     # PHASE 3: Final Synthesis
     # Combine everything into the final dossier
     # =========================================================================
 
-    if verbose:
-        print("  Synthesizing final dossier...")
-
     enrichment_str = json.dumps(enrichment, indent=2, default=str) if enrichment else "No enrichment data"
     following_str = "\n\n---\n\n".join(following_analyses) if following_analyses else "No following data analyzed"
     articles_str = json.dumps(results.articles, indent=2, default=str) if results.articles else "No articles found"
 
-    synthesis_prompt = SYNTHESIS_PROMPT.format(
-        enrichment_data=enrichment_str,
-        following_analyses=following_str,
-        sports_cluster=cluster_analyses.get("sports") or "No sports analysis available",
-        entertainment_cluster=cluster_analyses.get("entertainment") or "No entertainment analysis available",
-        causes_cluster=cluster_analyses.get("causes") or "No causes analysis available",
-        network_cluster=cluster_analyses.get("network") or "No network analysis available",
-        hidden_cluster=cluster_analyses.get("hidden") or "No hidden interests analysis available",
-        articles_data=articles_str
-    )
+    if question_ctx:
+        # Simulation mode: use SIMULATION_SYNTHESIS_PROMPT
+        _log("PHASE 3: Synthesizing simulation response...")
+        _synth_start = _time.time()
 
-    # Generate final dossier
+        # Combine all available cluster analyses into one block
+        cluster_parts = []
+        for cname in ["sports", "entertainment", "causes", "network", "hidden"]:
+            analysis = cluster_analyses.get(cname)
+            if analysis:
+                cluster_parts.append(f"### {cname.upper()} CLUSTER:\n{analysis}")
+            else:
+                priority_key = _cluster_priority_map.get(cname, cname)
+                priority = question_ctx.cluster_priorities.get(priority_key, "useful")
+                if priority == "skip":
+                    cluster_parts.append(f"### {cname.upper()} CLUSTER:\n(Skipped — not relevant to question)")
+                else:
+                    cluster_parts.append(f"### {cname.upper()} CLUSTER:\nNo data available")
+
+        cluster_combined = "\n\n".join(cluster_parts)
+
+        # Build question context summary for the prompt
+        q_context_str = f"""Question: {question_ctx.question}
+Specific signals to look for: {', '.join(question_ctx.specific_signals) if question_ctx.specific_signals else 'general'}
+Critical clusters: {', '.join(k for k, v in question_ctx.cluster_priorities.items() if v == 'critical')}
+Additional focus: {question_ctx.additional_focus}"""
+
+        synthesis_prompt = SIMULATION_SYNTHESIS_PROMPT.format(
+            question=question_ctx.question,
+            question_context=q_context_str,
+            enrichment_data=enrichment_str,
+            following_analyses=following_str,
+            cluster_analyses_combined=cluster_combined,
+            articles_data=articles_str
+        )
+    else:
+        # Standard dossier mode
+        _log("PHASE 3: Synthesizing final dossier...")
+        _synth_start = _time.time()
+
+        synthesis_prompt = SYNTHESIS_PROMPT.format(
+            enrichment_data=enrichment_str,
+            following_analyses=following_str,
+            sports_cluster=cluster_analyses.get("sports") or "No sports analysis available",
+            entertainment_cluster=cluster_analyses.get("entertainment") or "No entertainment analysis available",
+            causes_cluster=cluster_analyses.get("causes") or "No causes analysis available",
+            network_cluster=cluster_analyses.get("network") or "No network analysis available",
+            hidden_cluster=cluster_analyses.get("hidden") or "No hidden interests analysis available",
+            articles_data=articles_str
+        )
+
+    # Generate final output
     dossier = llm_call(synthesis_prompt)
 
-    if dossier and verbose:
-        print("  ✓ Dossier complete!")
+    mode_label = "Simulation" if question_ctx else "Synthesis"
+    _log(f"PHASE 3 COMPLETE: {mode_label} done", _synth_start)
+    _log(f"=== TOTAL LLM TIME: {_time.time() - _start_total:.1f}s ===")
 
     return dossier
 
@@ -1578,6 +2149,10 @@ Examples:
     # Raw JSON (no LLM)
     python deep_research.py --email "ceo@company.com" --json -o raw.json
 
+    # Simulation mode: how would this person respond to a question?
+    python deep_research.py --email "ceo@company.com" --question "What do they think about AI replacing jobs?"
+    python deep_research.py --email "ceo@company.com" --question "How would they react to a cold pitch about our startup?" -o simulation.md
+
 Environment Variables:
     NYNE_API_KEY        Your Nyne.ai API key (required)
     NYNE_API_SECRET     Your Nyne.ai API secret (required)
@@ -1598,12 +2173,21 @@ Get your Nyne.ai API keys at: https://nyne.ai
     parser.add_argument("--json", action="store_true", help="Output raw JSON instead of dossier")
     parser.add_argument("--llm", choices=["gemini", "openai", "anthropic", "auto"],
                        default="auto", help="LLM for dossier (default: auto)")
+    parser.add_argument("--backup-llm", choices=["gemini", "openai", "anthropic"],
+                       default=None, help="Backup LLM if primary fails/rate-limited (e.g., --backup-llm openai)")
+    parser.add_argument("--question", help="Simulate how this person would respond to a question (enables simulation mode)")
     parser.add_argument("--quiet", "-q", action="store_true", help="Suppress progress output")
 
     args = parser.parse_args()
 
     if not args.email and not args.linkedin:
         parser.error("At least --email or --linkedin is required")
+
+    # Set backup LLM if provided
+    if args.backup_llm:
+        set_backup_llm(args.backup_llm)
+        if not args.quiet:
+            print(f"  Backup LLM: {args.backup_llm}")
 
     input_data = ResearchInput(
         email=args.email,
@@ -1624,7 +2208,7 @@ Get your Nyne.ai API keys at: https://nyne.ai
             "articles": results.articles
         }, indent=2, default=str)
     else:
-        output = generate_dossier(results, llm=args.llm, verbose=not args.quiet)
+        output = generate_dossier(results, llm=args.llm, verbose=not args.quiet, question=args.question)
         if not output:
             output = "# No dossier generated\n\nEither no data was found or no LLM API key is configured."
 
@@ -1650,7 +2234,8 @@ def research_person(
     company: str = None,
     generate_dossier_flag: bool = True,
     llm: str = "auto",
-    verbose: bool = False
+    verbose: bool = False,
+    question: str = None
 ) -> Dict[str, Any]:
     """
     Programmatic API for deep research.
@@ -1659,6 +2244,10 @@ def research_person(
         from deep_research import research_person
         result = research_person(email="ceo@startup.com")
         print(result['dossier'])
+
+        # Simulation mode:
+        result = research_person(email="ceo@startup.com", question="What do they think about AI?")
+        print(result['simulation'])
     """
     input_data = ResearchInput(
         email=email,
@@ -1681,7 +2270,11 @@ def research_person(
     }
 
     if generate_dossier_flag:
-        output["dossier"] = generate_dossier(results, llm=llm, verbose=verbose)
+        result = generate_dossier(results, llm=llm, verbose=verbose, question=question)
+        if question:
+            output["simulation"] = result
+        else:
+            output["dossier"] = result
 
     return output
 
