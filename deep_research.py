@@ -1416,21 +1416,35 @@ QUESTION ANALYSIS CONTEXT:
 
 You have access to:
 1. Their full profile/enrichment data (including social profiles)
-2. Detailed analyses of accounts they follow (analyzed with focus on this question)
+2. Detailed analyses of their social graph and interests
 3. Deep cluster analyses (specialized for this question's topic)
 4. Articles and press mentions
 5. Personal details (location, career, family connections)
 
-CRITICAL RULE - ATTRIBUTION REQUIRED:
-Every claim about their likely position MUST be attributed to specific evidence:
-- An account they follow (e.g., "Follows @elonmusk and @TechCrunch, suggesting...")
-- A social media post they made (e.g., "Posted about X on 12/03/2025")
-- Their work history (e.g., "Spent 5 years at Google, so likely values...")
-- Their bio or self-description
-- An article or press mention
-- Their social graph patterns
+CRITICAL RULE - PRESENT INSIGHTS NATURALLY:
+You have rich data about this person. Use it to write with AUTHORITY and CONVICTION — as if you deeply know this person — but DO NOT expose the methodology. The reader should feel like they're getting intelligence from someone who truly understands this person, not a data report.
 
-DO NOT speculate without evidence. If evidence is weak, say so explicitly.
+NEVER DO THIS:
+- "Follows @handle, suggesting..."
+- "Based on their Twitter following list..."
+- "They follow 12 accounts related to..."
+- "Their social media follows indicate..."
+- "According to their social graph..."
+
+INSTEAD, use natural language like:
+- "Rabois is deeply embedded in the Project 2025 intellectual ecosystem"
+- "He's closely connected to Trump's inner circle — Kushner, Jason Miller, Karoline Leavitt"
+- "His worldview is shaped by the PayPal Mafia ethos of high-agency disruption"
+- "He shows strong engagement with the anti-DEI movement and figures like Christopher Rufo"
+- "He has a clear affinity towards hawkish foreign policy circles"
+- "His move from SF to Miami was itself a political statement"
+- "He's plugged into the DOGE orbit through connections to James Burnham and Russ Vought"
+
+Good framing words: "engagement with", "affinity towards", "closely connected to", "embedded in", "aligned with", "plugged into", "drawn to", "orbits around", "resonates with"
+
+Present insights as KNOWLEDGE, not as "we found this data point." The magic is in knowing things about someone that feel like insider understanding, not in showing your work. Save the sourcing for internal confidence — the output should read like a briefing from someone who KNOWS this person.
+
+For your own internal reasoning, every claim must still be grounded in real evidence from the data below. But the OUTPUT should not reveal the source methodology.
 
 ## ENRICHMENT DATA (Profile, Career, Social Profiles, Posts):
 {enrichment_data}
@@ -1446,40 +1460,94 @@ DO NOT speculate without evidence. If evidence is weak, say so explicitly.
 
 ---
 
-Write a THOROUGH simulation report with these sections:
+CRITICAL: INSUFFICIENT SIGNAL DETECTION
 
-## 1. EVIDENCE SUMMARY
-Organize ALL relevant data points by signal strength:
+Before writing the full report, evaluate whether the data contains DIRECT, SPECIFIC signal to answer this question. Apply this strict test:
 
-**Strong Signals (direct evidence):**
-- Direct posts or statements about this topic
-- Accounts they follow that directly relate to this question
-- Career experience directly relevant to this topic
-- Articles where they've spoken about this
+1. Can you point to at least 2-3 data points that DIRECTLY relate to the specific topic of the question?
+   - "They're into fitness" does NOT count as signal for "what's their favorite sock brand"
+   - "They work in tech" does NOT count as signal for "what programming language do they prefer"
+   - Adjacent or tangential interests are NOT sufficient — you need DIRECT relevance
 
-**Moderate Signals (adjacent evidence):**
-- Accounts they follow in adjacent areas
-- Career patterns that suggest a leaning
-- Social graph patterns (who do their follows follow?)
-- Demographic/psychographic indicators
+2. Would a reasonable person look at the evidence and say "yeah, that clearly tells us something about this specific question"?
+   - If the answer requires you to make 2+ logical leaps from the data, it's NOT enough signal
+   - If you're inferring preferences from general lifestyle/personality rather than specific evidence, it's NOT enough signal
 
-**Weak Signals (inferred):**
-- General personality traits that might influence their view
-- Generational or geographic patterns
-- Absence of expected follows (what they DON'T follow can be revealing)
+3. Are you about to write something you'd be embarrassed by if the real person read it?
+   - If the answer would make the person say "where the hell did they get THAT from?", use insufficient signal
+   - If the answer would make them say "yeah, that's pretty much right", proceed with the full report
 
-## 2. PSYCHOGRAPHIC REASONING
-Based on their overall profile, explain the reasoning chain:
-- Their core identity/archetype and how it relates to this question
-- Their values system and how it applies here
-- Their communication style and how they'd frame their answer
-- Any relevant life experiences that shape their perspective
-- Cognitive biases or tendencies suggested by their profile
+THE KEY TEST: Would the person themselves say "yeah, the data you had actually DOES reveal that about me"?
+If the answer is "no, you're just guessing based on my general vibe" — that's insufficient signal.
 
-## 3. SIMULATED RESPONSE
+EXAMPLES OF INSUFFICIENT SIGNAL — USE THE SHORT FORMAT:
+- "What's their favorite restaurant?" — unless they literally post about or engage with a specific restaurant
+- "What sock brand do they prefer?" — being into fitness does NOT tell you sock preferences. Being into cycling does NOT tell you sock preferences. Being a biohacker does NOT tell you sock preferences. You need them to have MENTIONED or ENGAGED WITH a specific sock brand.
+- "What car do they drive?" — being wealthy does NOT tell you their car brand
+- "What's their blood type?" — obviously no signal
+- "Do they prefer cats or dogs?" — unless there's direct pet-related evidence
+- "What's their favorite movie?" — unless they've posted about it or engage with specific films
+- ANY question about a specific product/brand preference — unless they directly engage with that specific brand or product category at a granular level
+
+IMPORTANT: Being in an adjacent lifestyle category is NOT sufficient signal for specific product preferences.
+"They're into fitness" → does NOT mean you know their shoe brand, gym, supplements, or gear preferences.
+"They're into tech" → does NOT mean you know their laptop, phone, or keyboard preferences.
+"They're into food" → does NOT mean you know their favorite restaurant.
+You need SPECIFIC, DIRECT evidence — a post, a mention, engagement with that exact brand/entity.
+
+EXAMPLES OF SUFFICIENT SIGNAL — USE THE FULL FORMAT:
+- "What do they think about Trump?" — political follows, news diet, and public statements ARE direct signal
+- "Are they into AI?" — following AI accounts, working in AI, posting about AI IS direct signal
+- "Do they like cycling?" — following cycling accounts and having a Strava IS direct signal
+- "How do they feel about climate change?" — following environmental orgs, posting about it IS direct signal
+
+If there is NOT enough DIRECT signal, you MUST use the INSUFFICIENT SIGNAL format below. Do NOT hallucinate. Do NOT extrapolate from tangential data. It is FAR better to say "we don't know" than to confidently make something up from vibes.
+
+=== INSUFFICIENT SIGNAL FORMAT ===
+Use this format when data is too thin to simulate a meaningful answer:
+
+## 1. AT A GLANCE
+
+**Question:** "{question}"
+**Sentiment:** Insufficient Data
+**Short Answer:** We don't have enough signal to predict this person's stance on this topic with any confidence.
+**Conviction Level:** Unknown
+**Confidence:** Insufficient Data — [explain what's missing]
+
+**What we looked for but didn't find:**
+- [Specific signals that would have helped but weren't present]
+- [Types of accounts, posts, or data that would be needed]
+
+**What we CAN say:**
+- [Any tangential observations, even if weak — or "Nothing relevant found"]
+
+**How to find out:**
+- [Practical suggestions — e.g., "Ask them directly", "Check their Amazon reviews", "Look at their Instagram stories"]
+
+=== END INSUFFICIENT SIGNAL FORMAT ===
+Do NOT continue to sections 2-6 if using this format. Stop after section 1.
+
+=== FULL REPORT FORMAT ===
+Use this format when you have real signal (at least moderate confidence):
+
+Write a THOROUGH simulation report with these sections IN THIS EXACT ORDER:
+
+## 1. AT A GLANCE
+A structured, scannable summary. Fill in each field:
+
+**Question:** "{question}"
+**Sentiment:** [Strongly Positive / Positive / Leaning Positive / Neutral / Leaning Negative / Negative / Strongly Negative]
+**Short Answer:** [1-2 sentence plain-English summary of their likely position]
+**Conviction Level:** [Passionate / Firm / Moderate / Ambivalent / Indifferent]
+**Confidence:** [High / Medium / Low] — [brief reason]
+**Key Drivers:** [3-5 bullet points — the core reasons behind their stance, each one line]
+
+This section should be instantly scannable — someone should be able to read it in 10 seconds and know the answer.
+
+## 2. SIMULATED RESPONSE
 Write out how this person would ACTUALLY respond if asked this question in a natural conversation. This should:
 - Use their actual communication style and tone (formal? casual? data-driven? emotional?)
-- Reference things they'd naturally reference (their interests, experiences, follows)
+- Reference things they'd naturally reference (their interests, experiences, relationships)
 - Include the nuance they'd add — most people don't give black-and-white answers
 - Show what they'd push back on or qualify
 - Include their likely emotional register (passionate? indifferent? cautious?)
@@ -1487,25 +1555,53 @@ Write out how this person would ACTUALLY respond if asked this question in a nat
 
 **Format as a realistic conversational response — not bullet points. Write it as dialogue.**
 
-## 4. CONFIDENCE ASSESSMENT
+## 3. CONFIDENCE ASSESSMENT
 Rate your overall confidence and break down by claim:
 
-**Overall Confidence:** [High/Medium/Low] — [explanation]
+**What we're most sure about:**
+- [Insight] — [why we're confident]
 
-**High Confidence Claims:**
-- [Claim] — [evidence]
+**Probable but less certain:**
+- [Insight] — [reasoning]
 
-**Medium Confidence Claims:**
-- [Claim] — [evidence + reasoning]
+**Educated guesses:**
+- [Insight] — [what makes this speculative]
 
-**Low Confidence / Speculative:**
-- [Claim] — [why this is speculative]
+**Blind spots:**
+- What we don't know that could change the picture
+- What a direct conversation would reveal that data can't
 
-**What We Don't Know:**
-- Key gaps in the data that would change the simulation
-- What additional information would increase confidence
+## 4. INTELLIGENCE BRIEF
+Present what we know about this person's relationship to the question topic, organized by confidence:
 
-## 5. CONVERSATION PLAYBOOK
+**Direct Connections:**
+- Public statements, posts, or articles where they've addressed this topic
+- Career experience and professional relationships directly relevant
+- Known affiliations, memberships, and close connections to key figures
+- Actions they've taken that reveal their position (moves, investments, public stances)
+
+**Contextual Signals:**
+- Their broader worldview, values, and intellectual circles
+- Career trajectory and professional ecosystem
+- Geographic, cultural, and generational context
+- Patterns in their interests and social circles
+
+**Inferred Leanings:**
+- Personality traits and decision-making patterns that predict their stance
+- What's conspicuously ABSENT from their world (what they avoid or reject)
+- How their archetype typically responds to topics like this
+
+REMEMBER: Write this section as an intelligence briefing — authoritative, insightful, no mention of "follows" or "following lists."
+
+## 5. PSYCHOGRAPHIC REASONING
+Based on their overall profile, explain the reasoning chain:
+- Their core identity/archetype and how it relates to this question
+- Their values system and how it applies here
+- Their communication style and how they'd frame their answer
+- Any relevant life experiences that shape their perspective
+- Cognitive biases or tendencies suggested by their profile
+
+## 6. CONVERSATION PLAYBOOK
 How to actually have this conversation with them:
 
 **Best way to bring this up:**
@@ -2153,6 +2249,10 @@ Examples:
     python deep_research.py --email "ceo@company.com" --question "What do they think about AI replacing jobs?"
     python deep_research.py --email "ceo@company.com" --question "How would they react to a cold pitch about our startup?" -o simulation.md
 
+    # Batch simulation: same question across many people
+    python deep_research.py --batch people.csv --question "What do they think about AI?" --batch-output results/
+    python deep_research.py --batch emails.txt --question "How do they feel about remote work?"
+
 Environment Variables:
     NYNE_API_KEY        Your Nyne.ai API key (required)
     NYNE_API_SECRET     Your Nyne.ai API secret (required)
@@ -2176,18 +2276,170 @@ Get your Nyne.ai API keys at: https://nyne.ai
     parser.add_argument("--backup-llm", choices=["gemini", "openai", "anthropic"],
                        default=None, help="Backup LLM if primary fails/rate-limited (e.g., --backup-llm openai)")
     parser.add_argument("--question", help="Simulate how this person would respond to a question (enables simulation mode)")
+    parser.add_argument("--batch", help="CSV or TXT file of people — runs the same --question against each person. CSV: 'email'/'linkedin' columns. TXT: one email or LinkedIn URL per line.")
+    parser.add_argument("--batch-output", help="Output directory for batch results (default: batch_results/)")
     parser.add_argument("--quiet", "-q", action="store_true", help="Suppress progress output")
 
     args = parser.parse_args()
-
-    if not args.email and not args.linkedin:
-        parser.error("At least --email or --linkedin is required")
 
     # Set backup LLM if provided
     if args.backup_llm:
         set_backup_llm(args.backup_llm)
         if not args.quiet:
             print(f"  Backup LLM: {args.backup_llm}")
+
+    # ---- BATCH MODE ----
+    if args.batch:
+        if not args.question:
+            parser.error("--batch requires --question (the question to simulate for each person)")
+
+        import csv
+
+        batch_dir = args.batch_output or "batch_results"
+        os.makedirs(batch_dir, exist_ok=True)
+
+        batch_file = args.batch
+        rows = []
+
+        if batch_file.endswith(".csv"):
+            # CSV with headers
+            with open(batch_file, newline="") as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+        elif batch_file.endswith(".txt"):
+            # Plain text — one email or LinkedIn URL per line
+            with open(batch_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "linkedin.com" in line:
+                        rows.append({"linkedin": line})
+                    else:
+                        rows.append({"email": line})
+        else:
+            parser.error("--batch file must be .csv or .txt")
+
+        if not rows:
+            print("⚠ Batch file is empty")
+            sys.exit(1)
+
+        # Validate columns
+        has_email = "email" in rows[0]
+        has_linkedin = "linkedin" in rows[0]
+        if not has_email and not has_linkedin:
+            parser.error("Batch file must contain email addresses or LinkedIn URLs")
+
+        print("=" * 60)
+        print(f"BATCH SIMULATION: {len(rows)} people")
+        print(f"Question: {args.question}")
+        print(f"Output: {batch_dir}/")
+        print("=" * 60)
+
+        summary_rows = []
+
+        for i, row in enumerate(rows):
+            email = row.get("email", "").strip() or None
+            linkedin = row.get("linkedin", "").strip() or None
+
+            if not email and not linkedin:
+                print(f"\n[{i+1}/{len(rows)}] ⚠ Skipping row — no email or linkedin")
+                continue
+
+            identifier = email or linkedin
+            print(f"\n[{i+1}/{len(rows)}] Researching: {identifier}")
+
+            try:
+                result = research_person(
+                    email=email,
+                    linkedin_url=linkedin,
+                    twitter_url=row.get("twitter", "").strip() or None,
+                    instagram_url=row.get("instagram", "").strip() or None,
+                    question=args.question,
+                    llm=args.llm,
+                    verbose=not args.quiet
+                )
+
+                simulation = result.get("simulation", "")
+                raw_data = result.get("data", {})
+                enrichment = raw_data.get("enrichment", {})
+                person_result = enrichment.get("result", {})
+                person_name = f"{person_result.get('firstname', '')} {person_result.get('lastname', '')}".strip() or "Unknown"
+
+                # Save individual file
+                safe_name = person_name.replace(" ", "_").replace("/", "_")[:50]
+                filename = f"{safe_name}.md"
+                filepath = os.path.join(batch_dir, filename)
+
+                with open(filepath, "w") as f:
+                    f.write(f"# Simulation: {person_name}\n\n")
+                    f.write(f"**Email:** {email or 'N/A'}\n")
+                    f.write(f"**LinkedIn:** {linkedin or 'N/A'}\n")
+                    f.write(f"**Question:** {args.question}\n\n---\n\n")
+                    f.write(simulation or "No simulation generated.")
+
+                # Extract structured data from AT A GLANCE for summary
+                sentiment = "Unknown"
+                short_answer = ""
+                if simulation:
+                    for line in simulation.split("\n"):
+                        if line.strip().startswith("**Sentiment:**"):
+                            sentiment = line.split("**Sentiment:**")[1].strip()
+                        elif line.strip().startswith("**Short Answer:**"):
+                            short_answer = line.split("**Short Answer:**")[1].strip()
+
+                summary_rows.append({
+                    "name": person_name,
+                    "email": email or "",
+                    "linkedin": linkedin or "",
+                    "sentiment": sentiment,
+                    "short_answer": short_answer,
+                    "file": filename
+                })
+
+                print(f"  ✓ {person_name} → {sentiment}")
+
+            except Exception as e:
+                print(f"  ✗ Error: {e}")
+                summary_rows.append({
+                    "name": identifier,
+                    "email": email or "",
+                    "linkedin": linkedin or "",
+                    "sentiment": "ERROR",
+                    "short_answer": str(e),
+                    "file": ""
+                })
+
+        # Write summary CSV
+        summary_path = os.path.join(batch_dir, "_summary.csv")
+        with open(summary_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["name", "email", "linkedin", "sentiment", "short_answer", "file"])
+            writer.writeheader()
+            writer.writerows(summary_rows)
+
+        # Write summary markdown
+        summary_md_path = os.path.join(batch_dir, "_summary.md")
+        with open(summary_md_path, "w") as f:
+            f.write(f"# Batch Simulation Summary\n\n")
+            f.write(f"**Question:** {args.question}\n")
+            f.write(f"**People:** {len(rows)}\n")
+            f.write(f"**Completed:** {len(summary_rows)}\n\n")
+            f.write("| Name | Sentiment | Short Answer |\n")
+            f.write("|------|-----------|-------------|\n")
+            for row in summary_rows:
+                f.write(f"| [{row['name']}]({row['file']}) | {row['sentiment']} | {row['short_answer'][:80]} |\n")
+
+        print(f"\n{'=' * 60}")
+        print(f"✓ BATCH COMPLETE: {len(summary_rows)}/{len(rows)} people")
+        print(f"  Summary CSV: {summary_path}")
+        print(f"  Summary MD:  {summary_md_path}")
+        print(f"  Individual:  {batch_dir}/")
+        print(f"{'=' * 60}")
+        return
+
+    # ---- SINGLE PERSON MODE ----
+    if not args.email and not args.linkedin:
+        parser.error("At least --email or --linkedin is required (or use --batch for batch mode)")
 
     input_data = ResearchInput(
         email=args.email,

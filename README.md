@@ -1,108 +1,30 @@
 # Nyne Deep Research
 
-Comprehensive person intelligence tool that combines multiple data sources into a single, actionable dossier.
-
----
-
-## Best Practices for Agents
-
-> **For best results, always provide BOTH email AND LinkedIn URL when available.**
-
-| Input | Data Quality | What You Get |
-|-------|--------------|--------------|
-| Email only | Good | Basic enrichment, may find social profiles |
-| LinkedIn only | Good | Profile data, posts, may find email |
-| **Email + LinkedIn** | **Best** | **Highest match confidence, all data sources, fastest** |
-
-**Key guidance for AI agents:**
-1. **Always try to get LinkedIn URL** - It's the richest source of career/education data
-2. **Email improves match accuracy** - Especially for common names
-3. **Twitter or Instagram unlocks psychographics** - Pass via `--twitter` or `--instagram`
-4. **Name/Company are auto-extracted** - No need to pass these manually
-
----
-
-## For Claude Code & AI Agents
-
-### Extracting More Data from Raw Response
-
-When you run with `--json` flag, the raw response contains a `social_profiles` object with URLs to many platforms. You can fetch these for additional context:
-
-```json
-"social_profiles": {
-  "twitter": { "url": "https://twitter.com/username", "followers": 5000 },
-  "strava": { "url": "https://www.strava.com/athletes/12345" },
-  "pinterest": { "url": "https://pinterest.com/username" },
-  "flickr": { "url": "https://flickr.com/people/username" },
-  "github": { "url": "https://github.com/username" },
-  "foursquare": { "url": "https://foursquare.com/user/12345" },
-  "angellist": { "url": "https://angel.co/username" }
-}
-```
-
-**What you can do with these:**
-| Profile | What to Fetch | Insights Gained |
-|---------|---------------|-----------------|
-| **Strava** | Activity feed | Cycling/running habits, fitness level, routes |
-| **Pinterest** | Boards & pins | Personal interests, aesthetics, hobbies |
-| **Flickr** | Photo albums | Photography interests, travel history |
-| **GitHub** | Repos, contributions | Technical skills, side projects, open source |
-| **Foursquare** | Check-ins | Favorite restaurants, travel patterns |
-| **AngelList** | Investments, roles | Startup involvement, investment thesis |
-
-### Workflow for Maximum Depth
-
-```
-1. Run deep_research.py with --json to get raw data
-2. Parse social_profiles from the response
-3. For each profile URL found:
-   - Fetch the page (WebFetch or browser)
-   - Extract relevant data (activities, posts, interests)
-4. Feed additional context back into analysis
-```
-
-### Key Fields in Raw Response
-
-The enrichment response includes rich data you can use:
-
-```
-result.social_profiles    → URLs to 20+ platforms
-result.newsfeed          → Recent LinkedIn posts with full text
-result.recommendations   → LinkedIn recommendations (how others see them)
-result.volunteering      → Causes they care about
-result.interests         → Skills, companies, keywords
-result.automobiles       → Vehicle ownership (yes, really)
-result.address           → Location data
-result.birthday          → Birth date if available
-```
+Comprehensive person intelligence. Given an email or LinkedIn URL, Nyne Deep Research builds an evidence-based dossier on any person — their interests, values, personality, relationships, and how they think.
 
 ---
 
 ## What It Does
 
-Given an email and/or LinkedIn URL, this tool:
+Nyne Deep Research aggregates data from multiple sources and runs 13 parallel AI analyses to produce a comprehensive intelligence profile. The output reads like a briefing from someone who truly knows this person.
 
-1. **Enriches** the person's profile (name, career, education, social profiles, recent posts)
-2. **Analyzes** who they follow on Twitter/X and Instagram (psychographic profiling)
-3. **Searches** for articles, podcasts, and press mentions
-4. **Runs deep cluster analysis** - 5 parallel LLM calls to cluster followed accounts by:
-   - Sports & Fitness (cycling, golf, basketball, etc.)
-   - Entertainment & Culture (music, comedy, food, podcasts)
-   - Causes & Politics (political leanings, social causes)
-   - Personal Network (low-follower friends, family, colleagues)
-   - Hidden Interests (unexpected follows, guilty pleasures)
-5. **Generates** an AI-powered dossier with evidence-based insights
+**Standard Mode:** Full 12-section dossier — identity, personality, career, interests, relationships, conversation starters, and approach strategy.
 
-### How It Works
+**Simulation Mode:** Ask "How would this person respond to [question]?" and get a predicted response in their voice, backed by evidence and a confidence assessment.
 
-```
-API Calls (3)           LLM Calls (13)                    Output (1)
-─────────────           ──────────────                    ──────────
-Enrichment    ────┐
-Following     ────┼───► 7 Batch Analyses (75 accounts each)
-Articles      ────┘     5 Cluster Analyses (parallel)    ───► dossier.md
-                        1 Final Synthesis
-```
+---
+
+## Best Practices
+
+> **For best results, always provide BOTH email AND LinkedIn URL when available.**
+
+| Input | Data Quality | What You Get |
+|-------|--------------|--------------|
+| Email only | Good | Basic enrichment, may discover additional profiles |
+| LinkedIn only | Good | Profile data, posts, may find email |
+| **Email + LinkedIn** | **Best** | **Highest match confidence, all data sources, fastest** |
+
+---
 
 ## Quick Start
 
@@ -116,42 +38,18 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your API keys
 
-# 3. Run research (ideally with BOTH email and LinkedIn)
+# 3. Run research
 python deep_research.py \
   --email "ceo@company.com" \
   --linkedin "https://linkedin.com/in/ceo-profile" \
   --output dossier.md
 ```
 
-## Installation
-
-### Requirements
-- Python 3.8+
-- Nyne.ai API credentials
-- At least one LLM API key (for dossier generation)
-
-### Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-Or install manually:
-```bash
-pip install requests python-dotenv google-generativeai
-```
-
-For alternative LLM providers:
-```bash
-pip install openai      # For OpenAI
-pip install anthropic   # For Anthropic Claude
-```
-
 ## Configuration
 
 ### Environment Variables
 
-Create a `.env` file in the project root (or set these as environment variables):
+Create a `.env` file in the project root:
 
 ```bash
 # Required - Nyne.ai credentials
@@ -173,36 +71,84 @@ ANTHROPIC_API_KEY=your_anthropic_key # Alternative
 | OpenAI | https://platform.openai.com/api-keys | Alternative LLM |
 | Anthropic | https://console.anthropic.com/ | Alternative LLM |
 
+---
+
 ## Usage
 
-### Command Line
+### Standard Dossier
 
 ```bash
-# IDEAL: Provide both email AND LinkedIn for best results
+# Full dossier on a person
 python deep_research.py \
   --email "john@company.com" \
   --linkedin "https://linkedin.com/in/johndoe" \
   --output dossier.md
 
-# Minimum: At least email or LinkedIn required
-python deep_research.py --email "john@company.com"
-python deep_research.py --linkedin "https://linkedin.com/in/johndoe"
-
-# With Twitter for psychographics (if you have it)
-python deep_research.py \
-  --email "john@company.com" \
-  --linkedin "https://linkedin.com/in/johndoe" \
-  --twitter "https://twitter.com/johndoe" \
-  --output dossier.md
-
-# Get raw JSON data (no LLM processing)
+# Raw JSON data (no AI analysis)
 python deep_research.py --email "john@company.com" --json --output data.json
 
 # Specify LLM provider
 python deep_research.py --email "john@company.com" --llm openai
+```
 
-# Quiet mode (no progress output)
-python deep_research.py --email "john@company.com" -q -o dossier.md
+### Simulation Mode
+
+Ask how someone would respond to a specific question:
+
+```bash
+# Single person
+python deep_research.py \
+  --email "ceo@company.com" \
+  --question "What do they think about AI replacing jobs?" \
+  --output simulation.md
+
+# The output includes:
+# 1. AT A GLANCE — sentiment, short answer, confidence, key drivers
+# 2. SIMULATED RESPONSE — first-person dialogue in their voice
+# 3. CONFIDENCE ASSESSMENT — what we're sure about vs. speculative
+# 4. INTELLIGENCE BRIEF — supporting evidence
+# 5. PSYCHOGRAPHIC REASONING — why they think this way
+# 6. CONVERSATION PLAYBOOK — how to bring this up with them
+```
+
+### Batch Simulation
+
+Run the same question across a list of people:
+
+```bash
+# From a CSV
+python deep_research.py \
+  --batch people.csv \
+  --question "How would they react to a cold pitch about our AI startup?" \
+  --batch-output results/
+
+# From a plain text file
+python deep_research.py \
+  --batch emails.txt \
+  --question "What do they think about AI?" \
+  --batch-output results/
+```
+
+**Output:**
+- `results/_summary.csv` — Spreadsheet with name, sentiment, and short answer for each person
+- `results/_summary.md` — Markdown table with links to individual reports
+- `results/Person_Name.md` — Full simulation for each person
+
+**CSV format:**
+```csv
+email,linkedin
+ceo@company1.com,https://linkedin.com/in/ceo1
+vp@company2.com,https://linkedin.com/in/vp2
+```
+
+Optional columns: `twitter`, `instagram`
+
+**TXT format** (one email or LinkedIn URL per line):
+```
+ceo@company1.com
+https://linkedin.com/in/vp2
+partner@vcfirm.com
+# Lines starting with # are ignored
 ```
 
 ### Python API
@@ -210,251 +156,123 @@ python deep_research.py --email "john@company.com" -q -o dossier.md
 ```python
 from deep_research import research_person
 
-# IDEAL: Provide both email AND LinkedIn
+# Standard dossier
 result = research_person(
     email="ceo@startup.com",
     linkedin_url="https://linkedin.com/in/founder"
 )
 print(result['dossier'])
 
-# With Twitter for psychographics
+# Simulation mode
 result = research_person(
     email="ceo@startup.com",
-    linkedin_url="https://linkedin.com/in/founder",
-    twitter_url="https://twitter.com/founder"
+    question="What do they think about remote work?"
 )
+print(result['simulation'])
 
-# Access raw data
-print(result['data']['enrichment'])   # Profile, career, education, posts
-print(result['data']['following'])     # Twitter psychographics
-print(result['data']['articles'])      # Press mentions
-
-# Skip dossier generation (just get data)
+# Raw data only
 result = research_person(
     email="ceo@startup.com",
     generate_dossier_flag=False
 )
+print(result['data'])
 ```
+
+---
 
 ## Output
 
 ### Dossier (Default)
 
-The tool generates a comprehensive markdown dossier with 13 sections:
+A comprehensive markdown dossier with 12 sections:
 
-1. **Identity Snapshot** - Name, role, location, age, personal details (address, phone, car)
-2. **Personal Life & Hobbies** - Active hobbies, entertainment tastes, causes, family indicators
-3. **Career DNA** - Complete trajectory with insights for each role, their "superpower"
-4. **Psychographic Profile** - Archetypes, values, beliefs, political leanings
-5. **Social Graph Analysis** - Overview of professional network, personal interests, inner circle
-6. **Interest Cluster Deep Dive** - Evidence-based analysis with specific handles:
-   - Sports & Fitness (which sports, participant vs spectator)
-   - Music & Entertainment (genres, artists, podcasts)
-   - Causes & Politics (political figures, social causes)
-   - Intellectual Interests (books, self-improvement)
-   - Tech Interests (crypto, AI, consumer tech)
-   - Geographic Ties (local community, hometown)
-   - Personal Network (low-follower friends, family)
-   - Unexpected/Surprising Follows
-7. **Content & Voice Analysis** - Topics, communication style, recent wins/frustrations
-8. **Key Relationships (Top 25)** - Most important accounts with relationship context
-9. **Conversation Starters (30+)** - Professional hooks, personal interest hooks, shared experiences
-10. **Recommendations & How Others See Them** - Patterns from LinkedIn recommendations
-11. **Warnings & Landmines** - Sensitive topics, career sore spots, political hot buttons
-12. **"Creepy Good" Insights** - Non-obvious patterns, cross-referenced discoveries
-13. **Approach Strategy** - Best angle, shared connections, topics to reference
+1. **Identity Snapshot** — Name, role, location, contact info, social profiles
+2. **Personal Life & Hobbies** — Active hobbies, entertainment tastes, causes, family indicators
+3. **Career DNA** — Complete trajectory with insights for each role
+4. **Psychographic Profile** — Archetypes, values, beliefs, aspirations
+5. **Social Graph Analysis** — Professional network, personal interests, inner circle
+6. **Interest Cluster Deep Dive** — Evidence-based analysis across sports, entertainment, causes, tech, and more
+7. **Content & Voice Analysis** — Topics, communication style, humor, opinions
+8. **Key Relationships (Top 25)** — Most important connections with context
+9. **Conversation Starters (30+)** — Professional, personal, and shared-experience hooks
+10. **Recommendations** — How others describe them
+11. **"Creepy Good" Insights** — Non-obvious patterns and cross-referenced discoveries
+12. **Approach Strategy** — Best angle, topics to reference, what NOT to do
 
-### Raw JSON (--json flag)
+### Simulation Output
 
-```json
-{
-  "enrichment": {
-    "result": {
-      "firstname": "John",
-      "lastname": "Doe",
-      "headline": "CEO at Acme Inc",
-      "summary": "...",
-      "careers_info": [...],
-      "schools_info": [...],
-      "social_profiles": {...},
-      "newsfeed": [...]
-    }
-  },
-  "following": {
-    "result": {
-      "interactions": [
-        {
-          "actor": {
-            "username": "elonmusk",
-            "display_name": "Elon Musk",
-            "bio": "...",
-            "followers_count": "180000000"
-          },
-          "relationship_type": "following"
-        }
-      ]
-    }
-  },
-  "articles": {
-    "result": {
-      "articles": [
-        {
-          "title": "...",
-          "url": "...",
-          "source": "TechCrunch",
-          "date": "2024-01-15"
-        }
-      ]
-    }
-  }
-}
-```
+When using `--question`, the output is restructured:
+
+1. **At a Glance** — Sentiment, short answer, conviction level, confidence rating, key drivers
+2. **Simulated Response** — First-person dialogue in their communication style
+3. **Confidence Assessment** — What's high-confidence vs. speculative
+4. **Intelligence Brief** — Supporting evidence organized by signal strength
+5. **Psychographic Reasoning** — Why they'd think this way
+6. **Conversation Playbook** — How to bring this up, what to avoid, predicted follow-ups
+
+**Insufficient Signal Detection:** If the question can't be answered from available data (e.g., "What's their favorite sock brand?"), the system detects this and returns an honest "insufficient data" response instead of hallucinating.
+
+---
 
 ## What Each Input Unlocks
 
-| Input | What It Unlocks | Why It Matters |
-|-------|-----------------|----------------|
-| **Email** | Match verification, work history, contact info | Confirms identity, especially for common names |
-| **LinkedIn URL** | Full career history, education, posts, bio | Richest professional data source |
-| **Twitter URL** | Who they follow (psychographics), tweets | Reveals interests, values, hidden hobbies |
-| **Instagram URL** | Who they follow (psychographics) | Alternative to Twitter for following analysis |
+| Input | What It Provides |
+|-------|-----------------|
+| **Email** | Identity verification, work history, contact info |
+| **LinkedIn URL** | Career history, education, posts, bio, recommendations |
+| **Twitter URL** | Psychographic profiling, interest mapping, personality signals |
+| **Instagram URL** | Alternative psychographic profiling |
 
-### Auto-Discovery
+The tool automatically discovers additional profiles from the initial enrichment — you don't need to manually provide all social URLs.
 
-The tool automatically extracts additional data from enrichment:
+---
 
+## LLM Configuration
+
+### Auto-Selection (Default)
 ```
-Email/LinkedIn → Enrichment → Extracts Name + Company → Article Search
-                           → Finds Twitter URL → Following List (psychographics)
+Priority: Gemini → OpenAI → Anthropic
 ```
 
-You don't need to pass `--name` or `--company` - they're extracted automatically from the enrichment response. Those flags only exist for edge cases where you want to search articles without doing enrichment first.
+### Supported Models
 
-## API Reference
+| Provider | Model | Notes |
+|----------|-------|-------|
+| **Gemini** | `gemini-3-flash-preview` | Recommended — fast and cheap |
+| **OpenAI** | `gpt-4o` | Alternative |
+| **Anthropic** | `claude-sonnet-4` | Alternative |
 
-See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for detailed documentation of all data fields.
+### Cost Estimates
 
-### Nyne.ai Endpoints Used
+Each dossier runs **13 parallel AI analyses**:
 
-| Endpoint | Purpose | Key Fields |
-|----------|---------|------------|
-| `POST /person/enrichment` | Person profile data | name, career, education, social, posts |
-| `POST /person/interactions` | Twitter following list | who they follow, follower counts |
-| `POST /person/articlesearch` | Press/podcast mentions | articles, interviews, media |
+- **Gemini**: ~$0.05-0.15 per dossier (recommended)
+- **GPT-4o**: ~$0.50-1.50 per dossier
+- **Claude Sonnet**: ~$0.30-0.80 per dossier
 
-All endpoints are async - you submit a request and poll for results.
+Simulation mode may use fewer analyses (irrelevant clusters are skipped), reducing cost.
+
+Use `--json` to skip AI analysis entirely and get raw data only.
+
+---
 
 ## Error Handling
 
 The tool gracefully handles missing data:
 
-- Missing API credentials: Shows helpful message with links
-- Failed API calls: Skips that data source, continues with others
-- No Twitter found: Skips psychographic analysis
-- No articles found: Skips press section
-- No LLM key: Returns raw data without dossier
+- Missing API credentials → helpful setup message
+- Failed API calls → skips that source, continues with others
+- No social profiles found → skips psychographic analysis
+- No articles found → skips press section
+- No LLM key → returns raw data without dossier
 
-No crashes - always returns whatever data is available.
+No crashes — always returns whatever data is available.
 
-## Examples
-
-### Sales Research (Best Practice)
-
-```bash
-# Research a prospect - provide email + LinkedIn for best results
-python deep_research.py \
-  --email "vp-engineering@target-company.com" \
-  --linkedin "https://linkedin.com/in/vp-engineering" \
-  --output prospect_research.md
-```
-
-### Investor Research (Best Practice)
-
-```bash
-# Research a VC before a pitch - LinkedIn + email if you have it
-python deep_research.py \
-  --linkedin "https://linkedin.com/in/vc-partner" \
-  --email "partner@vcfirm.com" \
-  --output investor_dossier.md
-```
-
-### Batch Processing
-
-```python
-import csv
-from deep_research import research_person
-
-with open('leads.csv') as f:
-    for row in csv.DictReader(f):
-        # Pass email + linkedin when available
-        result = research_person(
-            email=row.get('email'),
-            linkedin_url=row.get('linkedin_url'),
-            twitter_url=row.get('twitter_url'),  # Optional
-            generate_dossier_flag=False  # Just get data
-        )
-        # Process result...
-```
-
-## LLM Configuration
-
-### Auto-Selection (Default)
-The tool automatically selects an LLM based on which API keys are available:
-
-```
-Priority: Gemini → OpenAI → Anthropic
-```
-
-Just set whichever API key(s) you have, and the tool picks the first available.
-
-### Force a Specific LLM
-```bash
-python deep_research.py --email "ceo@company.com" --llm gemini
-python deep_research.py --email "ceo@company.com" --llm openai
-python deep_research.py --email "ceo@company.com" --llm anthropic
-```
-
-### Supported Models
-
-| Provider | Model | Max Output Tokens | Set via |
-|----------|-------|-------------------|---------|
-| **Gemini** | `gemini-3-flash-preview` | 65,536 | `GEMINI_API_KEY` |
-| **OpenAI** | `gpt-4o` | 16,384 | `OPENAI_API_KEY` |
-| **Anthropic** | `claude-sonnet-4` | 64,000 | `ANTHROPIC_API_KEY` |
-
-### Changing the Model
-
-To use a different model, edit the model name in `deep_research.py` (search for `_call_gemini`, `_call_openai`, or `_call_anthropic` functions).
-
-### Skip LLM (Raw Data Only)
-```bash
-python deep_research.py --email "ceo@company.com" --json -o raw_data.json
-```
-
-## Cost Considerations
-
-### Nyne.ai
-- Check https://nyne.ai for current pricing
-- See [API documentation](https://api.nyne.ai/documentation) for endpoint details
-- Each research uses 1-3 API calls depending on available data
-
-### LLM Costs (for dossier generation)
-
-Each dossier uses **13 LLM calls**:
-- 7 batch analyses (analyzing ~75 followed accounts each)
-- 5 cluster analyses (sports, entertainment, causes, network, hidden interests)
-- 1 final synthesis
-
-Estimated costs per dossier:
-- **Gemini 3 Flash**: ~$0.05-0.15 (recommended - fast and cheap)
-- **GPT-4o**: ~$0.50-1.50 per dossier
-- **Claude Sonnet**: ~$0.30-0.80 per dossier
-
-Use `--json` flag to skip LLM costs and get raw data only.
+---
 
 ## License
 
-MIT License - see LICENSE file.
+MIT License — see LICENSE file.
 
 ## Contributing
 

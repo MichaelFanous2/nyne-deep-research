@@ -22,8 +22,16 @@ env/
 *.md
 !README.md
 !docs/*.md
+!tutorials/*.md
+!SIMULATION_API_SPEC.md
+!SIMULATION_HANDOFF.md
 *.json
 output/
+batch_results/
+
+# Test output files (generated simulations)
+tests/*_simulation.md
+tests/simulation_output.md
 
 # OS
 .DS_Store
