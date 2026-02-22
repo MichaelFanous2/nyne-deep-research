@@ -1952,7 +1952,7 @@ For each flagged account, explain WHY it's relevant to the question.'''
 
             for future in as_completed(futures):
                 idx, analysis = future.result()
-                elapsed = time.time() - phase1_start
+                elapsed = time.time() - _batch_start
                 if analysis:
                     following_analyses.append((idx, analysis))
                     _log(f"  ✓ Batch {idx + 1}/{len(batches)} done ({_batch_times.get(idx, 0):.1f}s)")
@@ -2075,7 +2075,7 @@ Pay extra attention to any signals that would help predict their stance on this 
 
             for future in as_completed(futures):
                 cluster_name, analysis = future.result()
-                elapsed = time.time() - phase2_start
+                elapsed = time.time() - _cluster_start
                 if analysis:
                     cluster_analyses[cluster_name] = analysis
                     _log(f"  ✓ {cluster_name.capitalize()} cluster done ({_cluster_times.get(cluster_name, 0):.1f}s)")
